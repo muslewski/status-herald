@@ -1,0 +1,15 @@
+{
+  "name": "status-herald",
+  "version": "0.0.0",
+  "description": "HERALD — heads-up engine for terminal status surfaces",
+  "type": "module",
+  "bin": { "herald": "bin/herald" },
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "test": "node --test",
+    "lint": "biome check .",
+    "format": "biome format --write ."
+  },
+  "devDependencies": { "@biomejs/biome": "1.9.4" },
+  "license": "MIT"
+}
