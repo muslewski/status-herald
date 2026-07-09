@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   arm,
   cover,
+  disarm,
   focus,
   reveal,
   revealAll,
@@ -100,6 +101,32 @@ test("cover is a no-op when already covered (live window not lost)", () => {
   cover("s1", t);
   cover("s1", t); // second cover must not overwrite @herald_live_win with @curtain
   assert.equal(t.getSessOpt("s1", "@herald_live_win"), "@live");
+});
+
+test("cover never captures the card window as live_win (desync self-heal)", () => {
+  const t = makeT(freshSession());
+  arm("s1", t);
+  t.setSessOpt("s1", "@herald_state", "working");
+  cover("s1", t); // active=@curtain, covered=1, live_win=@live
+  // Force the desync: covered flag reset while still parked on the card.
+  t.setSessOpt("s1", "@herald_covered", "0");
+  assert.equal(t._S.s1.active, "@curtain");
+  cover("s1", t);
+  assert.equal(
+    t.getSessOpt("s1", "@herald_live_win"),
+    "@live",
+    "card window must never be captured as live_win",
+  );
+});
+
+test("disarm reveals the live window before killing the card", () => {
+  const t = makeT(freshSession());
+  arm("s1", t);
+  t.setSessOpt("s1", "@herald_state", "working");
+  cover("s1", t);
+  disarm("s1", t);
+  assert.equal(t._S.s1.active, "@live");
+  assert.equal(t.getSessOpt("s1", "@herald_armed"), "0");
 });
 
 test("revealAll reveals every covered armed session", () => {

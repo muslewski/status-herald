@@ -40,7 +40,7 @@ exposes these commands:
 
 ```bash
 herald curtain arm [<session>]   # add a card window to a session (run inside it, or name it)
-herald curtain disarm            # remove it
+herald curtain disarm [<session>]  # remove it (run inside, or name it)
 herald curtain cover <session>   # show the card (if working/done/needs)
 herald curtain reveal <session>  # show the live session
 herald curtain focus "<title>"   # reveal the tab whose label == title, cover the rest
