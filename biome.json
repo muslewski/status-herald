@@ -2,5 +2,10 @@
   "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
   "files": { "ignore": ["node_modules", "scripts/spike"] },
   "linter": { "enabled": true, "rules": { "recommended": true } },
-  "formatter": { "enabled": true, "indentStyle": "space", "indentWidth": 2, "lineWidth": 80 }
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 80
+  }
 }

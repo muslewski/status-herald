@@ -1,9 +1,14 @@
-import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync, readFileSync, existsSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { install, uninstall, mergeHooks, hooksInstalled } from "../lib/curtain/install.mjs";
+import { test } from "node:test";
+import {
+  hooksInstalled,
+  install,
+  mergeHooks,
+  uninstall,
+} from "../lib/curtain/install.mjs";
 
 const tmp = () => join(mkdtempSync(join(tmpdir(), "herald-")), "settings.json");
 
@@ -18,7 +23,10 @@ test("install into a fresh file writes all three hooks", () => {
 
 test("install preserves unrelated keys and backs up", () => {
   const p = tmp();
-  writeFileSync(p, JSON.stringify({ model: "opus", hooks: { Stop: [] } }, null, 2));
+  writeFileSync(
+    p,
+    JSON.stringify({ model: "opus", hooks: { Stop: [] } }, null, 2),
+  );
   const r = install(p);
   assert.equal(r.ok, true);
   assert.equal(existsSync(`${p}.bak`), true);
@@ -53,9 +61,19 @@ test("uninstall removes exactly the herald hooks", () => {
 });
 
 test("mergeHooks does not duplicate an already-present hook", () => {
-  const s = { hooks: { UserPromptSubmit: [{ hooks: [{ type: "command", command: "herald curtain event working" }] }] } };
+  const s = {
+    hooks: {
+      UserPromptSubmit: [
+        {
+          hooks: [{ type: "command", command: "herald curtain event working" }],
+        },
+      ],
+    },
+  };
   const changed = mergeHooks(s);
-  const count = s.hooks.UserPromptSubmit.filter((g) => g.hooks.some((h) => h.command === "herald curtain event working")).length;
+  const count = s.hooks.UserPromptSubmit.filter((g) =>
+    g.hooks.some((h) => h.command === "herald curtain event working"),
+  ).length;
   assert.equal(count, 1);
   assert.equal(changed, true); // Stop + Notification still added
 });

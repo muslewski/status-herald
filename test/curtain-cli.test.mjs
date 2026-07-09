@@ -1,10 +1,13 @@
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { test } from "node:test";
 
 const run = (args, env) => {
   try {
-    const stdout = execFileSync("node", ["bin/herald", ...args], { encoding: "utf8", env });
+    const stdout = execFileSync("node", ["bin/herald", ...args], {
+      encoding: "utf8",
+      env,
+    });
     return { status: 0, stdout, stderr: "" };
   } catch (e) {
     return { status: e.status, stdout: e.stdout ?? "", stderr: e.stderr ?? "" };
@@ -25,7 +28,10 @@ test("herald curtain bogus prints usage to stderr, exit 1", () => {
 
 test("herald curtain status with no TMUX_PANE reports not in tmux, exit 0", () => {
   const env = { ...process.env };
-  delete env.TMUX_PANE;
+  // env is a plain object handed to execFileSync's `env` option, which drops
+  // undefined-valued keys before building the child environment — equivalent
+  // to `delete` here (unlike the real process.env, which coerces to "undefined").
+  env.TMUX_PANE = undefined;
   const { status, stdout } = run(["curtain", "status"], env);
   assert.equal(status, 0);
   assert.match(stdout, /not in tmux/);
@@ -38,7 +44,8 @@ test("herald curtain focus-in with no pane arg is a safe no-op, exit 0", () => {
 
 test("herald curtain event with no pane/state is a safe no-op, exit 0", () => {
   const env = { ...process.env };
-  delete env.TMUX_PANE;
+  // see note above: undefined-valued keys are dropped by execFileSync's env normalization.
+  env.TMUX_PANE = undefined;
   const { status } = run(["curtain", "event"], env);
   assert.equal(status, 0);
 });

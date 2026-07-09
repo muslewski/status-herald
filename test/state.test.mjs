@@ -1,6 +1,11 @@
-import { test } from "node:test";
 import assert from "node:assert/strict";
-import { STATES, isState, formatElapsed, computeElapsed } from "../lib/curtain/state.mjs";
+import { test } from "node:test";
+import {
+  STATES,
+  computeElapsed,
+  formatElapsed,
+  isState,
+} from "../lib/curtain/state.mjs";
 
 test("formatElapsed formats m:ss and h:mm:ss", () => {
   assert.equal(formatElapsed(0), "0:00");
@@ -11,7 +16,7 @@ test("formatElapsed formats m:ss and h:mm:ss", () => {
 
 test("formatElapsed clamps bad input to 0:00", () => {
   assert.equal(formatElapsed(-5), "0:00");
-  assert.equal(formatElapsed(NaN), "0:00");
+  assert.equal(formatElapsed(Number.NaN), "0:00");
 });
 
 test("computeElapsed subtracts and floors at 0", () => {

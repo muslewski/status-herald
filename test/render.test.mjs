@@ -1,6 +1,6 @@
-import { test } from "node:test";
 import assert from "node:assert/strict";
-import { color, visibleWidth, padCenter, clearScreen } from "../lib/render.mjs";
+import { test } from "node:test";
+import { clearScreen, color, padCenter, visibleWidth } from "../lib/render.mjs";
 
 test("visibleWidth ignores SGR escapes", () => {
   assert.equal(visibleWidth("\x1b[31mabc\x1b[0m"), 3);
