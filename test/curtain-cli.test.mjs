@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 
 const run = (args, env) => {
   try {
@@ -48,4 +49,36 @@ test("herald curtain event with no pane/state is a safe no-op, exit 0", () => {
   env.TMUX_PANE = undefined;
   const { status } = run(["curtain", "event"], env);
   assert.equal(status, 0);
+});
+
+const BIN = fileURLToPath(new URL("../bin/herald", import.meta.url));
+const runCli = (args, env = {}) =>
+  execFileSync("node", [BIN, ...args], {
+    encoding: "utf8",
+    env: { ...process.env, TMUX: "", TMUX_PANE: "", ...env },
+  });
+
+test("curtain focus outside tmux is hook-safe (exit 0, no throw)", () => {
+  // listArmed returns [] with no tmux; focus is a no-op that must not throw.
+  const out = runCli(["curtain", "focus", "Nothing"]);
+  assert.equal(typeof out, "string");
+});
+
+test("curtain reveal-all outside tmux is hook-safe", () => {
+  runCli(["curtain", "reveal-all"]);
+});
+
+test("curtain arm outside tmux is hook-safe", () => {
+  runCli(["curtain", "arm"]);
+});
+
+test("unknown curtain subcommand still prints usage listing new verbs", () => {
+  let out = "";
+  try {
+    execFileSync("node", [BIN, "curtain", "bogus"], { encoding: "utf8" });
+  } catch (e) {
+    out = `${e.stdout || ""}${e.stderr || ""}`;
+  }
+  assert.match(out, /arm/);
+  assert.match(out, /focus/);
 });
