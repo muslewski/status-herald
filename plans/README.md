@@ -37,6 +37,9 @@ invariant.
 | 008 | Identity: display name, `herald name`, tmux rename sync | P2 | S | 003, 005, 006 | TODO |
 | 009 | Documentation to the agentic-sage quality bar | P2 | M | 001–008 | TODO |
 | 010 | Research spike: zellij + kitty surfaces (report only) | P3 | S | 002, 005 | TODO |
+| 011 | Open-source launch: GitHub remote, npm publish, install paths | P2 | M | 001 (Part A); 001–009 (Part B) | TODO |
+| 012 | Website brand brief: HERALD voice, positioning, family contrast | P3 | M | — | TODO |
+| 013 | Agent-hierarchy awareness (curtain shipped; statusline + tmux bar) | P1 | M | 005 | IN PROGRESS |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
 REJECTED (with one-line rationale)
@@ -56,7 +59,17 @@ REJECTED (with one-line rationale)
 - **009 last among the buildout** — it documents shipped behavior and
   executes README examples against the real CLI.
 - **010 anytime** after 005; its report seeds the next planning round
-  (plans 011+).
+  (plans 012+).
+- **011 splits**: Part A (GitHub remote + settings) can run right after
+  001 — early push turns CI on for every later plan's branch and makes the
+  README badges real. Part B (npm publish) strictly after 009 — the README
+  is the npm product page; never publish the Plan 001 skeleton.
+- **012 anytime** — document-only (no code deps); produces
+  `docs/brand/BRIEF.md`, the brand foundation for the future
+  `status-herald-site` repo (brief → explorations → assembly, the
+  agentic-sage-site process). Its copy is drafted from the plan set and
+  must be re-verified against shipped reality at site-build time; the
+  actual site explorations are future plans in the site repo, not here.
 
 ## Design decisions (recorded so nobody re-litigates)
 
@@ -81,6 +94,11 @@ REJECTED (with one-line rationale)
   (no external write API). No third naming scheme invented.
 - **Fail-open everywhere on render paths** — empty output + exit 0 beats an
   error in a status bar (agentic-sage's statusline stance).
+- **Distribution: npm registry only in v1** — `npm i -g status-herald` is
+  the primary install (global-install decision above); `npx status-herald`
+  comes free as the zero-install trial path. pip is N/A (Node project);
+  Homebrew/AUR/single-binary wait for demand (Plan 011 records the
+  revisit triggers).
 
 ## Findings considered and rejected
 
