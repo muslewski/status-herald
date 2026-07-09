@@ -54,13 +54,19 @@ trusting its name:
 - **background shells still running** at `Stop` → `✅ DONE · 1 shell in bg`.
   A CI watch or a long build does not hold you up; the card just says so.
 - `Notification` splits on `notification_type`: a `permission_prompt` is
-  `⚠ NEEDS YOU`, an `idle_prompt` is `✅ DONE` — and never overrides a
-  permission prompt that is still waiting on you.
+  `⚠ NEEDS YOU`, an `idle_prompt` is `✅ DONE` — but an `idle_prompt` never
+  overrides a permission prompt that is still waiting on you, and never calls
+  a session done while its subagents are still running. A `Notification`
+  payload carries no `background_tasks` at all, so that last rule reads the
+  counts stored by the last event that did carry them. "The main agent is
+  idle" is exactly what a main agent looks like while it waits on subagents.
 
 One caveat, by design: a turn resumed by its finishing subagents emits no
 second `Stop`, so the card holds `WORKING` until Claude Code's idle
-notification lands (~60s). Being a minute late to `DONE` beats being a minute
-early, which is what sends you to a tab that is still working.
+notification lands (~60s) *and* the subagent count has drained to zero. Being
+a minute late to `DONE` beats being a minute early, which is what sends you to
+a tab that is still working. `UserPromptSubmit` and `arm` both zero the
+counts, so a count that somehow never drains cannot strand a card forever.
 
 Grind Mode (Mac idle-nag) is phase 2 — separate spec.
 

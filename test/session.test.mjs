@@ -292,6 +292,61 @@ test("stampFromHook leaves the counts alone for events without background_tasks"
   assert.equal(t.getSessOpt("s1", "@herald_bg_subagents"), "2");
 });
 
+test("stampFromHook: idle_prompt cannot call a subagent turn done", () => {
+  // The eventizer bug, replayed from its real 2026-07-09 timeline. Stop at
+  // 20:07:22 carried three running subagents; idle_prompt at 20:08:22 carried
+  // no background_tasks at all, and used to overwrite WORKING with DONE while
+  // all three were still running. It must read the stored counts instead.
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  stampFromHook(
+    "%9",
+    { event: "Stop", hasTasks: true, subagents: 3, shells: 0 },
+    1000,
+    t,
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "working");
+
+  const idle = {
+    event: "Notification",
+    notificationType: "idle_prompt",
+    hasTasks: false,
+    subagents: 0,
+    shells: 0,
+  };
+  stampFromHook("%9", idle, 1060, t);
+  assert.equal(
+    t.getSessOpt("s1", "@herald_state"),
+    "working",
+    "three subagents are still running",
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_bg_subagents"), "3");
+
+  // The last SubagentStop drains the count; only then does idle mean idle.
+  stampFromHook(
+    "%9",
+    { event: "SubagentStop", hasTasks: true, subagents: 0, shells: 0 },
+    1100,
+    t,
+  );
+  assert.equal(
+    t.getSessOpt("s1", "@herald_state"),
+    "working",
+    "still not done",
+  );
+  stampFromHook("%9", idle, 1160, t);
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "done");
+});
+
+test("arm clears stale in-flight counts", () => {
+  // Otherwise a re-arm inherits a count that no event will ever drain, and
+  // every future idle_prompt is held at WORKING forever.
+  const t = makeT(freshSession());
+  t.setSessOpt("s1", "@herald_bg_subagents", 3);
+  arm("s1", t);
+  assert.equal(t.getSessOpt("s1", "@herald_bg_subagents"), "0");
+});
+
 test("stampFromHook is a no-op outside tmux", () => {
   const t = makeT(freshSession());
   t.sessionOf = () => "";

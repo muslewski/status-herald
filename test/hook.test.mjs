@@ -11,6 +11,7 @@ const ev = (o) => ({
   event: "Stop",
   agentId: "",
   notificationType: "",
+  hasTasks: false,
   subagents: 0,
   shells: 0,
   ...o,
@@ -155,6 +156,44 @@ test("idle_prompt is the terminal signal a resumed turn never sends otherwise", 
   // a turn resumed by a completing background task ever emits.
   const n = ev({ event: "Notification", notificationType: "idle_prompt" });
   assert.equal(nextState(STATES.WORKING, n), STATES.DONE);
+});
+
+test("idle_prompt does not mean done while subagents are still running", () => {
+  // Observed live (eventizer, 2026-07-09): Stop at 20:07:22 carried three
+  // running subagents and correctly held WORKING; idle_prompt at 20:08:22 then
+  // flipped the card to DONE while all three were still working. A Notification
+  // payload carries no background_tasks -- its only keys are `message` and
+  // `notification_type` -- so the rule has to consult the counts we stored from
+  // the last event that did carry them. "Main agent is idle" is exactly what a
+  // main agent looks like while it waits on its subagents.
+  const n = ev({ event: "Notification", notificationType: "idle_prompt" });
+  assert.equal(nextState(STATES.WORKING, n, { subagents: 3 }), STATES.WORKING);
+  assert.equal(nextState(STATES.DONE, n, { subagents: 1 }), STATES.WORKING);
+});
+
+test("idle_prompt with only background shells left is still done", () => {
+  // A shell never blocks you, so it must not hold the card at WORKING.
+  const n = ev({ event: "Notification", notificationType: "idle_prompt" });
+  assert.equal(
+    nextState(STATES.WORKING, n, { subagents: 0, shells: 2 }),
+    STATES.DONE,
+  );
+});
+
+test("a permission prompt beats a running subagent", () => {
+  // You are blocked either way, but only NEEDS YOU tells you to go look.
+  const n = ev({
+    event: "Notification",
+    notificationType: "permission_prompt",
+  });
+  assert.equal(nextState(STATES.WORKING, n, { subagents: 3 }), STATES.NEEDS);
+});
+
+test("Stop trusts its own payload over the stored counts", () => {
+  // Stop always carries background_tasks, so a stale stored count must not
+  // resurrect WORKING once the subagents have actually drained.
+  const stop = ev({ event: "Stop", subagents: 0, hasTasks: true });
+  assert.equal(nextState(STATES.WORKING, stop, { subagents: 3 }), STATES.DONE);
 });
 
 test("idle_prompt must never clear a pending permission prompt", () => {

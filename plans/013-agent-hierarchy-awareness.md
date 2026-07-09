@@ -25,6 +25,8 @@ every Claude Code hook payload verbatim. Five days, 289 `Stop` events.
 | `idle_prompt` is the only end-marker a resumed turn sends | 97 of 153 `idle_prompt`s follow no `Stop` at all |
 | `idle_prompt` can fire behind an unanswered permission prompt | 1 of 69 — so it must never clear `needs` |
 | Hooks are re-read per event, not snapshotted at session start | a session whose `claude` pid started 17:08 ran the freshly-installed command at 19:52, 96s after `install` rewrote `settings.json` |
+| `Notification` carries no `background_tasks` | its only non-envelope keys are `message` and `notification_type` |
+| `idle_prompt` fires while subagents are still running | eventizer: `Stop` 20:07:22 with 3 running subagents, `idle_prompt` 20:08:22 — main was idle *because* it was waiting on them |
 
 There is **no** `TurnStart` hook (0 occurrences in the 2.1.205 binary; a
 `TaskCreated`/`TaskCompleted` pair exists but tracks the task list, not
@@ -50,7 +52,10 @@ JSON on stdin, because the event *name* cannot express the difference between
   (a CI watch does not hold you up; you can move to the next thing)
 - `SubagentStop` → state unchanged, in-flight counts refreshed
 - `Notification/permission_prompt` → **NEEDS**
-- `Notification/idle_prompt` → **DONE**, unless already **NEEDS**
+- `Notification/idle_prompt` → **DONE**, unless already **NEEDS**, and unless
+  subagents are still in flight — a `Notification` payload has no
+  `background_tasks` (its only keys are `message` and `notification_type`), so
+  this rule reads the counts stored by the last event that had them
 
 Session-scoped tmux options: `@herald_state`, `@herald_since`,
 `@herald_bg_subagents`, `@herald_bg_shells`.
