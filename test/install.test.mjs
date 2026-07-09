@@ -60,6 +60,18 @@ test("uninstall removes exactly the herald hooks", () => {
   assert.equal(hooksInstalled(s), false);
 });
 
+test("install does not overwrite the pristine .bak on an idempotent re-run", () => {
+  const p = tmp();
+  writeFileSync(p, JSON.stringify({ model: "opus" }, null, 2));
+  install(p); // 1st: makes .bak = pristine {model:"opus"}
+  const bakAfterFirst = readFileSync(`${p}.bak`, "utf8");
+  install(p); // 2nd: idempotent, must NOT touch .bak
+  assert.equal(readFileSync(`${p}.bak`, "utf8"), bakAfterFirst);
+  const bak = JSON.parse(bakAfterFirst);
+  assert.equal(bak.model, "opus");
+  assert.equal("hooks" in bak && bak.hooks?.UserPromptSubmit != null, false); // .bak has NO herald hooks
+});
+
 test("mergeHooks does not duplicate an already-present hook", () => {
   const s = {
     hooks: {
