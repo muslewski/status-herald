@@ -24,6 +24,7 @@ every Claude Code hook payload verbatim. Five days, 289 `Stop` events.
 | `Notification` is two different events | `notification_type`: `idle_prompt` (65) vs `permission_prompt` (30) |
 | `idle_prompt` is the only end-marker a resumed turn sends | 97 of 153 `idle_prompt`s follow no `Stop` at all |
 | `idle_prompt` can fire behind an unanswered permission prompt | 1 of 69 — so it must never clear `needs` |
+| Hooks are re-read per event, not snapshotted at session start | a session whose `claude` pid started 17:08 ran the freshly-installed command at 19:52, 96s after `install` rewrote `settings.json` |
 
 There is **no** `TurnStart` hook (0 occurrences in the 2.1.205 binary; a
 `TaskCreated`/`TaskCompleted` pair exists but tracks the task list, not

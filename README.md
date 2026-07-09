@@ -17,8 +17,12 @@ herald curtain install # wire Claude Code hooks into ~/.claude/settings.json
 
 `install` wires one command, `herald curtain hook`, onto `UserPromptSubmit`,
 `SubagentStart`, `SubagentStop`, `Stop` and `Notification`, and removes the
-older `herald curtain event <state>` hooks if it finds them. Hook changes only
-take effect in Claude Code sessions started afterwards.
+older `herald curtain event <state>` hooks if it finds them. Already-running
+Claude Code sessions pick the change up at their next hook event — no restart
+needed (measured on 2.1.205: a session started 1h44m earlier ran the new
+command 96s after install). Existing curtain windows do need a re-arm
+(`herald curtain disarm <s> && herald curtain arm <s>`) to render the new
+subagent/shell annotations.
 
 ### Use
 
