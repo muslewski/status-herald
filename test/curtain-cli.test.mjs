@@ -1,5 +1,12 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import {
+  mkdtempSync as _mk,
+  rmSync as _rm,
+  writeFileSync as _wf,
+} from "node:fs";
+import { tmpdir as _td } from "node:os";
+import { join as _j } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
@@ -81,4 +88,22 @@ test("unknown curtain subcommand still prints usage listing new verbs", () => {
   }
   assert.match(out, /arm/);
   assert.match(out, /focus/);
+});
+
+test("curtain arm no-ops (exit 0) when curtain.enabled=false", () => {
+  const dir = _mk(_j(_td(), "herald-cfg-"));
+  const p = _j(dir, "c.json");
+  _wf(p, JSON.stringify({ curtain: { enabled: false } }));
+  try {
+    runCli(["curtain", "arm", "nope-sess"], { HERALD_CONFIG: p });
+  } finally {
+    _rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("curtain focus normalizes a [mosh] prefix before matching (no throw off-tmux)", () => {
+  // Off tmux, listArmed() is empty so focus is a no-op; this asserts the
+  // normalized path runs without throwing and exits cleanly.
+  const out = runCli(["curtain", "focus", "[mosh] Something"]);
+  assert.equal(typeof out, "string");
 });
