@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { arm, cover, reveal, revealAll } from "../lib/curtain/session.mjs";
+import {
+  arm,
+  cover,
+  focus,
+  reveal,
+  revealAll,
+  stampSession,
+} from "../lib/curtain/session.mjs";
 
 // In-memory tmux double. Sessions: { [name]: { opts:{}, active:winId, windows:{winId:name} } }
 const makeT = (init = {}) => {
@@ -102,4 +109,68 @@ test("revealAll reveals every covered armed session", () => {
   cover("s1", t);
   revealAll(t);
   assert.equal(t._S.s1.active, "@live");
+});
+
+const twoArmed = () => ({
+  s1: {
+    opts: {
+      "@herald_armed": "1",
+      "@herald_live_win": "@w1",
+      "@herald_state": "working",
+      "@herald_covered": "0",
+    },
+    active: "@w1",
+    windows: { "@w1": "Syndcast Backlog", "@curtain": "_curtain" },
+  },
+  s2: {
+    opts: {
+      "@herald_armed": "1",
+      "@herald_live_win": "@w2",
+      "@herald_state": "working",
+      "@herald_covered": "0",
+    },
+    active: "@w2",
+    windows: { "@w2": "Sage Run", "@curtain": "_curtain" },
+  },
+});
+
+test("focus reveals the matching title and covers the rest", () => {
+  const t = makeT(twoArmed());
+  // start both covered so we can observe the reveal of the match
+  cover("s1", t);
+  cover("s2", t);
+  focus("Syndcast Backlog", t);
+  assert.equal(t._S.s1.active, "@w1", "matched session revealed");
+  assert.equal(t.getSessOpt("s1", "@herald_covered"), "0");
+  assert.equal(t._S.s2.active, "@curtain", "other session stays covered");
+  assert.equal(t.getSessOpt("s2", "@herald_covered"), "1");
+});
+
+test("focus with an empty title covers all coverable sessions", () => {
+  const t = makeT(twoArmed());
+  focus("", t);
+  assert.equal(t.getSessOpt("s1", "@herald_covered"), "1");
+  assert.equal(t.getSessOpt("s2", "@herald_covered"), "1");
+});
+
+test("focus never covers an idle session", () => {
+  const t = makeT(twoArmed());
+  t.setSessOpt("s2", "@herald_state", "idle");
+  focus("Syndcast Backlog", t);
+  assert.equal(t.getSessOpt("s2", "@herald_covered"), "0", "idle stays live");
+});
+
+test("stampSession sets session state and since on working", () => {
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  stampSession("%9", "working", 1000, t);
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "working");
+  assert.equal(t.getSessOpt("s1", "@herald_since"), "1000");
+  stampSession("%9", "done", 2000, t);
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "done");
+  assert.equal(
+    t.getSessOpt("s1", "@herald_since"),
+    "1000",
+    "since unchanged off working",
+  );
 });
