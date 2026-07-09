@@ -84,3 +84,13 @@ test("buildArgs.selectWindow / killWindow target a window", () => {
     "syndcast:_curtain",
   ]);
 });
+
+test("buildArgs.unsetSessOpt clears a session option with -u", () => {
+  assert.deepEqual(buildArgs.unsetSessOpt("syndcast", "set-titles-string"), [
+    "set",
+    "-u",
+    "-t",
+    "syndcast",
+    "set-titles-string",
+  ]);
+});

@@ -12,13 +12,78 @@ import {
 
 const tmp = () => join(mkdtempSync(join(tmpdir(), "herald-")), "settings.json");
 
-test("install into a fresh file writes all three hooks", () => {
+test("install into a fresh file wires every state-moving event", () => {
   const p = tmp();
   const r = install(p);
   assert.equal(r.ok, true);
   assert.equal(r.changed, true);
   const s = JSON.parse(readFileSync(p, "utf8"));
   assert.equal(hooksInstalled(s), true);
+  assert.deepEqual(Object.keys(s.hooks).sort(), [
+    "Notification",
+    "Stop",
+    "SubagentStart",
+    "SubagentStop",
+    "UserPromptSubmit",
+  ]);
+});
+
+test("install migrates the legacy event hooks away instead of doubling up", () => {
+  // The old wiring mapped Stop straight to "done". Leaving it in place would let
+  // it overwrite the payload-aware state on every turn end.
+  const p = tmp();
+  writeFileSync(
+    p,
+    JSON.stringify({
+      hooks: {
+        Stop: [
+          {
+            hooks: [{ type: "command", command: "herald curtain event done" }],
+          },
+        ],
+        UserPromptSubmit: [
+          {
+            hooks: [
+              { type: "command", command: "herald curtain event working" },
+            ],
+          },
+          { hooks: [{ type: "command", command: "some-other-tool" }] },
+        ],
+      },
+    }),
+  );
+  const r = install(p);
+  assert.equal(r.ok, true);
+  const s = JSON.parse(readFileSync(p, "utf8"));
+  const cmds = Object.values(s.hooks)
+    .flat()
+    .flatMap((g) => g.hooks.map((h) => h.command));
+  assert.equal(
+    cmds.filter((c) => c.startsWith("herald curtain event")).length,
+    0,
+    "legacy herald hooks removed",
+  );
+  assert.equal(cmds.filter((c) => c === "herald curtain hook").length, 5);
+  assert.ok(cmds.includes("some-other-tool"), "foreign hooks untouched");
+});
+
+test("uninstall removes legacy hooks too", () => {
+  const p = tmp();
+  writeFileSync(
+    p,
+    JSON.stringify({
+      hooks: {
+        Stop: [
+          {
+            hooks: [{ type: "command", command: "herald curtain event done" }],
+          },
+        ],
+      },
+    }),
+  );
+  uninstall(p);
+  const s = JSON.parse(readFileSync(p, "utf8"));
+  assert.deepEqual(s.hooks.Stop, []);
 });
 
 test("install preserves unrelated keys and backs up", () => {
@@ -76,16 +141,14 @@ test("mergeHooks does not duplicate an already-present hook", () => {
   const s = {
     hooks: {
       UserPromptSubmit: [
-        {
-          hooks: [{ type: "command", command: "herald curtain event working" }],
-        },
+        { hooks: [{ type: "command", command: "herald curtain hook" }] },
       ],
     },
   };
   const changed = mergeHooks(s);
   const count = s.hooks.UserPromptSubmit.filter((g) =>
-    g.hooks.some((h) => h.command === "herald curtain event working"),
+    g.hooks.some((h) => h.command === "herald curtain hook"),
   ).length;
   assert.equal(count, 1);
-  assert.equal(changed, true); // Stop + Notification still added
+  assert.equal(changed, true); // the other four events still added
 });

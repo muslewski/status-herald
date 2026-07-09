@@ -27,6 +27,49 @@ test("needs card shows NEEDS YOU", () => {
   assert.match(text, /NEEDS YOU/);
 });
 
+test("working card names the subagents that are keeping it busy", () => {
+  const one = renderCard("working", 42, 60, 10, { subagents: 1 })
+    .map(plain)
+    .join("\n");
+  assert.match(one, /0:42 · 1 subagent(?!s)/);
+  const many = renderCard("working", 42, 60, 10, { subagents: 3 })
+    .map(plain)
+    .join("\n");
+  assert.match(many, /0:42 · 3 subagents/);
+});
+
+test("done card reports background shells you can safely leave running", () => {
+  const one = renderCard("done", 0, 60, 10, { shells: 1 })
+    .map(plain)
+    .join("\n");
+  assert.match(one, /DONE/);
+  assert.match(one, /focus to open · 1 shell in bg/);
+  const many = renderCard("done", 0, 60, 10, { shells: 2 })
+    .map(plain)
+    .join("\n");
+  assert.match(many, /focus to open · 2 shells in bg/);
+});
+
+test("a working card with no subagents keeps the bare elapsed clock", () => {
+  const text = renderCard("working", 42, 40, 10, { subagents: 0 })
+    .map(plain)
+    .join("\n");
+  assert.doesNotMatch(text, /subagent/);
+});
+
+test("subagents never leak onto the DONE card, nor shells onto WORKING", () => {
+  // Stop with subagents in flight is never DONE, and a shell never blocks you,
+  // so each count belongs to exactly one card.
+  const done = renderCard("done", 0, 60, 10, { subagents: 3 })
+    .map(plain)
+    .join("\n");
+  assert.doesNotMatch(done, /subagent/);
+  const working = renderCard("working", 5, 60, 10, { shells: 2 })
+    .map(plain)
+    .join("\n");
+  assert.doesNotMatch(working, /shell/);
+});
+
 test("unknown state falls back to idle without throwing", () => {
   assert.equal(renderCard("bogus", 0, 40, 6).length, 6);
 });

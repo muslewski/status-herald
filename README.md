@@ -15,6 +15,11 @@ npm link               # put `herald` on PATH
 herald curtain install # wire Claude Code hooks into ~/.claude/settings.json
 ```
 
+`install` wires one command, `herald curtain hook`, onto `UserPromptSubmit`,
+`SubagentStart`, `SubagentStop`, `Stop` and `Notification`, and removes the
+older `herald curtain event <state>` hooks if it finds them. Hook changes only
+take effect in Claude Code sessions started afterwards.
+
 ### Use
 
 ```bash
@@ -28,6 +33,30 @@ While a session works and its pane is unfocused it shows `● WORKING m:ss`;
 finished panes show `✅ DONE`; blocked panes show `⚠ NEEDS YOU`. Click a card
 to reveal the live session; click away to re-cover it while it is still
 working.
+
+### What the card knows about subagents
+
+A Claude Code session is a main agent plus whatever subagents and background
+shells it has dispatched, so "the turn ended" and "the work finished" are not
+the same event. Claude Code's `Stop` hook means the first one: it fires once
+per user prompt, even while `background_tasks` still lists running work, and
+it never fires again when a completing task wakes the agent back up.
+
+`herald curtain hook` therefore reads each hook's stdin payload rather than
+trusting its name:
+
+- **subagents still running** at `Stop` → stays `● WORKING · 2 subagents`,
+  because a subagent keeps the main agent busy and you cannot act yet.
+- **background shells still running** at `Stop` → `✅ DONE · 1 shell in bg`.
+  A CI watch or a long build does not hold you up; the card just says so.
+- `Notification` splits on `notification_type`: a `permission_prompt` is
+  `⚠ NEEDS YOU`, an `idle_prompt` is `✅ DONE` — and never overrides a
+  permission prompt that is still waiting on you.
+
+One caveat, by design: a turn resumed by its finishing subagents emits no
+second `Stop`, so the card holds `WORKING` until Claude Code's idle
+notification lands (~60s). Being a minute late to `DONE` beats being a minute
+early, which is what sends you to a tab that is still working.
 
 Grind Mode (Mac idle-nag) is phase 2 — separate spec.
 
@@ -68,6 +97,14 @@ adapter — normalizes it via `curtain.focus.titleStripPrefixes` (stripping a
 transport prefix like mosh's `"[mosh] "` and trimming) before matching it
 against a session's window label. An adapter that pre-strips the title will
 break matching for anyone whose config uses a different prefix.
+
+A terminal's title follows tmux's *active* window, so a covered session would
+otherwise advertise itself as `_curtain` — and focusing that tab would tell the
+adapter "no session matches", covering everything instead of revealing the tab
+you just clicked. To prevent that, `arm` pins the session's `set-titles-string`
+so it always reports the **live** window's name, card or no card; `disarm`
+removes the override. A covered tab therefore keeps its normal title, and
+focusing it reveals it.
 
 ### Config reference
 

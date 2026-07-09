@@ -7,7 +7,7 @@ import {
 } from "node:fs";
 import { tmpdir as _td } from "node:os";
 import { join as _j } from "node:path";
-import { test } from "node:test";
+import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 const run = (args, env) => {
@@ -59,10 +59,27 @@ test("herald curtain event with no pane/state is a safe no-op, exit 0", () => {
 });
 
 const BIN = fileURLToPath(new URL("../bin/herald", import.meta.url));
+
+// TMUX="" does not mean "outside tmux": the client ignores an empty $TMUX and
+// falls back to the default socket, so these tests would drive the developer's
+// real tmux server (`focus` covers every armed session it finds there). Point
+// tmux at an empty socket dir instead, where no server exists.
+const SOCK_DIR = _mk(_j(_td(), "herald-nosock-"));
+after(() => _rm(SOCK_DIR, { recursive: true, force: true }));
+
+// execFileSync's `env` option drops undefined-valued keys, truly unsetting them.
+const cliEnv = (env = {}) => ({
+  ...process.env,
+  TMUX: undefined,
+  TMUX_PANE: undefined,
+  TMUX_TMPDIR: SOCK_DIR,
+  ...env,
+});
+
 const runCli = (args, env = {}) =>
   execFileSync("node", [BIN, ...args], {
     encoding: "utf8",
-    env: { ...process.env, TMUX: "", TMUX_PANE: "", ...env },
+    env: cliEnv(env),
   });
 
 test("curtain focus outside tmux is hook-safe (exit 0, no throw)", () => {
@@ -82,7 +99,10 @@ test("curtain arm outside tmux is hook-safe", () => {
 test("unknown curtain subcommand still prints usage listing new verbs", () => {
   let out = "";
   try {
-    execFileSync("node", [BIN, "curtain", "bogus"], { encoding: "utf8" });
+    execFileSync("node", [BIN, "curtain", "bogus"], {
+      encoding: "utf8",
+      env: cliEnv(),
+    });
   } catch (e) {
     out = `${e.stdout || ""}${e.stderr || ""}`;
   }

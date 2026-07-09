@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
 import { onEvent, onFocusIn } from "../lib/curtain/orchestrator.mjs";
 import { getOpt, windowNameOf } from "../lib/curtain/tmux.mjs";
@@ -46,8 +49,16 @@ test(
   "event working covers an unfocused live pane; focus-in reveals it",
   { skip: !hasTmux() },
   () => {
-    const { live, cur } = buildGrid();
+    // Without this the whole test drives the developer's real tmux server.
+    const origTmpdir = process.env.TMUX_TMPDIR;
+    const origTmux = process.env.TMUX;
+    const dir = mkdtempSync(join(tmpdir(), "herald-grid-"));
+    process.env.TMUX_TMPDIR = dir;
+    // biome-ignore lint/performance/noDelete: env must be truly unset; `= undefined` coerces to the string "undefined".
+    delete process.env.TMUX;
+
     try {
+      const { live, cur } = buildGrid();
       // detached session → not focused → cover
       onEvent(live, "working", 1000);
       assert.equal(getOpt(live, "@herald_state"), "working");
@@ -57,7 +68,16 @@ test(
       onFocusIn(cur);
       assert.equal(windowNameOf(live), "grid", "live revealed back to grid");
     } finally {
-      tt(["kill-session", "-t", S]);
+      try {
+        execFileSync("tmux", ["kill-server"], { stdio: "ignore" });
+      } catch {}
+      // biome-ignore lint/performance/noDelete: restore a possibly-unset var.
+      if (origTmpdir === undefined) delete process.env.TMUX_TMPDIR;
+      else process.env.TMUX_TMPDIR = origTmpdir;
+      // biome-ignore lint/performance/noDelete: restore a possibly-unset var.
+      if (origTmux === undefined) delete process.env.TMUX;
+      else process.env.TMUX = origTmux;
+      rmSync(dir, { recursive: true, force: true });
     }
   },
 );

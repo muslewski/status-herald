@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  TITLE_FMT,
   arm,
   armAll,
   cover,
@@ -8,6 +9,7 @@ import {
   focus,
   reveal,
   revealAll,
+  stampFromHook,
   stampSession,
 } from "../lib/curtain/session.mjs";
 
@@ -20,6 +22,9 @@ const makeT = (init = {}) => {
     setSessOpt: (s, k, v) => {
       S[s] ??= { opts: {}, active: "@live", windows: {} };
       S[s].opts[k] = String(v);
+    },
+    unsetSessOpt: (s, k) => {
+      delete S[s]?.opts?.[k];
     },
     activeWindowId: (s) => S[s]?.active ?? "",
     selectWindow: (target) => {
@@ -130,6 +135,26 @@ test("disarm reveals the live window before killing the card", () => {
   assert.equal(t.getSessOpt("s1", "@herald_armed"), "0");
 });
 
+test("arm pins the terminal title to the live window, not the card", () => {
+  const t = makeT(freshSession());
+  arm("s1", t);
+  assert.equal(t.getSessOpt("s1", "set-titles"), "on");
+  const fmt = t.getSessOpt("s1", "set-titles-string");
+  // When the card is active the format must resolve the live window's name,
+  // otherwise a focused covered tab reports "_curtain" and focus() covers it.
+  assert.equal(fmt, TITLE_FMT);
+  assert.match(fmt, /@herald_live_win/);
+  assert.match(fmt, /_curtain/);
+});
+
+test("disarm drops the session-local title overrides", () => {
+  const t = makeT(freshSession());
+  arm("s1", t);
+  disarm("s1", t);
+  assert.equal(t.getSessOpt("s1", "set-titles-string"), "");
+  assert.equal(t.getSessOpt("s1", "set-titles"), "");
+});
+
 test("revealAll reveals every covered armed session", () => {
   const t = makeT(freshSession());
   arm("s1", t);
@@ -201,6 +226,82 @@ test("stampSession sets session state and since on working", () => {
     "1000",
     "since unchanged off working",
   );
+});
+
+test("stampFromHook keeps a session WORKING when Stop leaves subagents running", () => {
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  const ev = (o) => ({
+    event: "Stop",
+    agentId: "",
+    notificationType: "",
+    hasTasks: true,
+    subagents: 0,
+    shells: 0,
+    ...o,
+  });
+  stampFromHook(
+    "%9",
+    ev({ event: "UserPromptSubmit", hasTasks: false }),
+    1000,
+    t,
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "working");
+  assert.equal(t.getSessOpt("s1", "@herald_since"), "1000");
+
+  stampFromHook("%9", ev({ subagents: 2 }), 2000, t);
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "working", "not done yet");
+  assert.equal(t.getSessOpt("s1", "@herald_bg_subagents"), "2");
+  assert.equal(
+    t.getSessOpt("s1", "@herald_since"),
+    "1000",
+    "a resumed turn keeps counting from the prompt",
+  );
+});
+
+test("stampFromHook reports DONE with background shells still running", () => {
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  stampFromHook(
+    "%9",
+    { event: "Stop", hasTasks: true, subagents: 0, shells: 1 },
+    2000,
+    t,
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "done");
+  assert.equal(t.getSessOpt("s1", "@herald_bg_shells"), "1");
+});
+
+test("stampFromHook leaves the counts alone for events without background_tasks", () => {
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  stampFromHook(
+    "%9",
+    { event: "Stop", hasTasks: true, subagents: 2, shells: 0 },
+    1000,
+    t,
+  );
+  // SubagentStart carries no background_tasks; zeroing here would erase the
+  // subagent that was just launched.
+  stampFromHook(
+    "%9",
+    { event: "SubagentStart", hasTasks: false, subagents: 0, shells: 0 },
+    1001,
+    t,
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_bg_subagents"), "2");
+});
+
+test("stampFromHook is a no-op outside tmux", () => {
+  const t = makeT(freshSession());
+  t.sessionOf = () => "";
+  stampFromHook(
+    "%9",
+    { event: "Stop", hasTasks: true, subagents: 0, shells: 0 },
+    1,
+    t,
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "");
 });
 
 test("armAll arms every session matching the glob", () => {
