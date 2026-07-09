@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   arm,
+  armAll,
   cover,
   disarm,
   focus,
@@ -200,4 +201,28 @@ test("stampSession sets session state and since on working", () => {
     "1000",
     "since unchanged off working",
   );
+});
+
+test("armAll arms every session matching the glob", () => {
+  const t = makeT({
+    "web-1": { opts: {}, active: "@a", windows: { "@a": "Web 1" } },
+    "web-2": { opts: {}, active: "@b", windows: { "@b": "Web 2" } },
+    api: { opts: {}, active: "@c", windows: { "@c": "Api" } },
+  });
+  t.listSessions = () => ["web-1", "web-2", "api"];
+  armAll("web*", t);
+  assert.equal(t.getSessOpt("web-1", "@herald_armed"), "1");
+  assert.equal(t.getSessOpt("web-2", "@herald_armed"), "1");
+  assert.equal(t.getSessOpt("api", "@herald_armed"), "", "non-match not armed");
+});
+
+test("armAll with * arms all", () => {
+  const t = makeT({
+    s1: { opts: {}, active: "@a", windows: { "@a": "S1" } },
+    s2: { opts: {}, active: "@b", windows: { "@b": "S2" } },
+  });
+  t.listSessions = () => ["s1", "s2"];
+  armAll("*", t);
+  assert.equal(t.getSessOpt("s1", "@herald_armed"), "1");
+  assert.equal(t.getSessOpt("s2", "@herald_armed"), "1");
 });
