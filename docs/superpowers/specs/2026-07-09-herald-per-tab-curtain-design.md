@@ -143,3 +143,76 @@ Mirror the phase-1 discipline: prove the risky assumption before building on it.
 1. Passwordless ssh key Mac → box already exists (fleet uses it).
 2. Ghostty's focused-window title reflects the active tab and changes on switch (user-confirmed) and is observable via Hammerspoon `AXTitleChanged` (Phase-0 spike verifies).
 3. macOS Accessibility permission can be granted to Hammerspoon (one-time).
+
+---
+
+## Addendum (2026-07-09): OSS productionization — configurable trigger adapters
+
+**Status:** design decision, supersedes the Hammerspoon-only trigger of Component 2. Driven by the Phase-0 spike outcome on real hardware.
+
+### Product framing
+
+status-herald ships as an **open-source UI toolkit for agentic development** — a family of terminal status surfaces (tmux status bar, Claude Code statusline, the tab **curtain**, more later) sharing one config and one engine. Every surface must be **enable/disable/customizable** and must not hardcode one user's environment. This addendum makes the per-tab curtain conform; the statusline/status-bar surfaces are **future work** (separate specs, same config file).
+
+### Phase-0 outcome & pivot
+
+The spike ran against the real Mac. Findings: Hammerspoon was **not installed**, there was **no Homebrew** to install it, and `osascript` accessibility was initially denied. But the box already reaches the Mac over a passwordless ssh alias (`mac-music`, used by the notify hooks), and once macOS **Accessibility** was granted, `osascript` over that ssh channel reads the frontmost Ghostty tab title reliably. Proven end-to-end on live data: focused tab `"[mosh] BTW questions about advisor plans"` → normalize → `"BTW questions about advisor plans"` → resolves to box session `syndcast-3`.
+
+This is exactly the spec's Phase-0 fallback ("Fail ⇒ find another Ghostty focus signal"). The trigger is therefore **not Hammerspoon-specific**.
+
+### Trigger = pluggable focus-source adapters
+
+The box contract is unchanged and is the integration seam: **`herald curtain focus "<title>"`**. Anything that can name the focused terminal tab can drive the curtain. status-herald ships reference adapters; users pick one or write their own:
+
+| Adapter | Mechanism | Best for |
+|---|---|---|
+| **ssh-osascript poll** (reference) | box polls the Mac's frontmost terminal-tab title over ssh (`osascript` + Accessibility), normalizes, calls `focus` on change | macOS + ssh already set up (mosh fleets); zero Mac install |
+| **Hammerspoon** (alternative) | Mac-resident `AXTitleChanged`/focus observer pushes `focus` to the box | users who run Hammerspoon; event-driven, no polling |
+| (community) | kitty remote-control, tmux-local focus, WezTerm, … | other terminals |
+
+**Normalization** lives in the adapter (it knows its transport's quirks — e.g. mosh's `[mosh] ` title prefix). Adapters emit the **clean tmux window-name string**; the box `focus` stays exact-match against `windowNameOf(liveWin)` — a clean, adapter-agnostic contract. The strip list is config-driven so a user can tune it without editing code.
+
+### Configuration
+
+Zero-dependency JSON at `${XDG_CONFIG_HOME:-~/.config}/status-herald/config.json` (override with `HERALD_CONFIG`). Absent file ⇒ built-in defaults, so the tool works out of the box. Relevant curtain keys:
+
+```json
+{
+  "curtain": {
+    "enabled": true,
+    "coverableStates": ["working", "done", "needs"],
+    "focus": {
+      "source": "ssh-osascript",
+      "pollMs": 350,
+      "ssh": { "host": "mac-music", "connectTimeout": 4 },
+      "terminalApp": "ghostty",
+      "titleStripPrefixes": ["[mosh] "]
+    },
+    "autoArm": { "enabled": true, "sessionGlob": "*" }
+  }
+}
+```
+
+- `curtain.enabled` — master switch; when false the CLI verbs no-op and the agent exits.
+- `coverableStates` — which states cover (idle always excluded).
+- `focus.source` — which adapter the agent launcher runs (`ssh-osascript` | `hammerspoon` | `manual`).
+- `focus.pollMs`, `focus.ssh.*`, `focus.terminalApp`, `focus.titleStripPrefixes` — parameters for the ssh-poll adapter.
+- `autoArm` — whether `repo-session` (or `arm-all`) arms sessions, and which.
+
+A `herald config` command prints the resolved config (defaults + overrides) for debugging. The loader is `lib/config.mjs`, zero-dep, hook-safe (bad JSON ⇒ defaults + a stderr warning, never a throw).
+
+### Deployment
+
+- **Agent launcher:** `scripts/focus-agent/ghostty-ssh-poll.sh` — the reference adapter, reads config, loops `read focused title → normalize → herald curtain focus`. Bounded/`--once` mode for testing; unbounded for the service.
+- **Service (opt-in):** a `systemd --user` unit **template** (`contrib/systemd/status-herald-curtain.service`) documented in the README; the user installs it (`systemctl --user enable --now`). Not force-installed.
+- **Arming:** `herald curtain arm-all` arms every current session matching `autoArm.sessionGlob`; `repo-session` gains an opt-in `herald curtain arm` on new `--claude` tabs. Both honor `curtain.enabled`.
+
+### Fail-open, unchanged
+
+Keypress-reveal in the card loop + `herald curtain reveal-all` remain the safety net. If the ssh poll stalls (Mac asleep/off-network) the loop simply produces no focus changes; sessions keep their last state and nothing is stranded.
+
+### Out of scope (this increment)
+
+- Statusline and tmux status-bar surfaces (future specs; will reuse `lib/config.mjs`).
+- The Hammerspoon adapter's full build (kept as documented alternative; the ssh-poll adapter is the shipped default).
+- Non-macOS / non-Ghostty adapters (community).
