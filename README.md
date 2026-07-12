@@ -158,6 +158,8 @@ The `curtain` block, with its defaults:
   "focus": {
     "source": "ssh-osascript",
     "pollMs": 350,
+    "eventFile": "$HOME/.local/state/status-herald/focus-events",
+    "heartbeatSec": 20,
     "ssh": { "host": "mac-music", "connectTimeout": 4 },
     "terminalApp": "ghostty",
     "titleStripPrefixes": ["[mosh] "]
@@ -169,10 +171,17 @@ The `curtain` block, with its defaults:
 - `enabled` — kill switch; when `false` every per-tab verb (`arm`, `disarm`,
   `cover`, `reveal`, `reveal-all`, `focus`, `arm-all`) no-ops.
 - `coverableStates` — session states eligible to be covered by a card.
-- `focus.source` — label for which trigger mechanism is in play (informational;
-  doesn't change box behavior). The reference adapter is `"ssh-osascript"`.
-- `focus.pollMs` — how often the reference ssh-poll adapter re-reads the
-  frontmost tab title.
+- `focus.source` — which reference adapter the dispatcher (`run.sh`) runs:
+  `"ssh-osascript"` (poll, the default + agent-free fallback) or
+  `"ghostty-hammerspoon"` (event-driven stream; needs the Mac emitter).
+- `focus.pollMs` — how often the **poll** adapter re-reads the frontmost tab
+  title (ignored by the event-driven adapter).
+- `focus.eventFile` — path **on the Mac** the Hammerspoon emitter appends to and
+  the stream adapter tails. Expanded by the remote shell, so use `$HOME`, not
+  `~` (tilde does not expand inside the quoted remote `tail`).
+- `focus.heartbeatSec` — how often the emitter writes a keepalive line; the
+  stream adapter treats no line for `2*heartbeatSec+5`s as a dead emitter and
+  restarts.
 - `focus.ssh.host` / `focus.ssh.connectTimeout` — the ssh target (an ssh
   config alias or `user@host`) and its connect timeout, in seconds.
 - `focus.terminalApp` — the macOS app name the adapter checks is frontmost
@@ -250,11 +259,41 @@ unbounded poll loop used by the systemd unit below. `--sentinel FILE` (exit
 once `FILE` disappears) and `--max SEC` (exit after a time budget) are for
 bounded/manual test runs.
 
+### Event-driven (Hammerspoon) adapter
+
+The poll adapter reads the Mac ~every `pollMs`; the event-driven adapter reacts
+the instant a Ghostty window/tab is focused, with **zero** idle cost. It needs a
+small emitter running on the Mac (Hammerspoon) plus `source: "ghostty-hammerspoon"`.
+
+```bash
+# On the Mac:
+# 1. Install Hammerspoon (https://www.hammerspoon.org) and grant it
+#    Accessibility (System Settings -> Privacy & Security -> Accessibility).
+# 2. Install the emitter and load it from your Hammerspoon config:
+mkdir -p ~/.hammerspoon
+cp mac/herald-focus.lua ~/.hammerspoon/herald-focus.lua      # from a repo checkout
+printf '\ndofile(hs.configdir .. "/herald-focus.lua")\n' >> ~/.hammerspoon/init.lua
+# 3. Reload Hammerspoon (console: hs.reload()). The console prints
+#    "herald-focus emitter armed -> <event file>".
+
+# On the box: point the config at the stream adapter, then restart the service.
+#   curtain.focus.source = "ghostty-hammerspoon"
+```
+
+The emitter's `EVENT_FILE`, `APP_NAME`, and `HEARTBEAT_SEC` constants must match
+`curtain.focus.eventFile` (with `$HOME` expanded), `terminalApp`, and
+`heartbeatSec`. The stream adapter falls back to a one-shot osascript read on
+startup and after any reconnect, so state is always correct even across a Mac
+sleep or a Hammerspoon restart.
+
 ### systemd install (opt-in)
 
 ```bash
 mkdir -p ~/.local/share/status-herald ~/.config/systemd/user
-cp scripts/focus-agent/ghostty-ssh-poll.sh ~/.local/share/status-herald/
+cp scripts/focus-agent/run.sh \
+   scripts/focus-agent/ghostty-ssh-poll.sh \
+   scripts/focus-agent/ghostty-hammerspoon-stream.sh \
+   ~/.local/share/status-herald/
 cp contrib/systemd/status-herald-curtain.service ~/.config/systemd/user/
 systemctl --user daemon-reload
 systemctl --user enable --now status-herald-curtain
@@ -275,12 +314,13 @@ recovery) — any adapter that calls it on tab-focus-change qualifies. Poll,
 or subscribe to native OS events; run on the box itself, over ssh, or push
 through a queue. Only rule: send the **raw** title and let the box normalize.
 
-`mac/herald-spike.lua` documents the alternative: a Hammerspoon
-(`hs.window.filter`) event-driven adapter that watches Ghostty title/focus
-changes on the Mac natively, with no polling and no ssh round trip — at the
-cost of a Hammerspoon dependency on the Mac. Wire its callback to shell out
-`ssh <box> herald curtain focus "<title>"` (or run `herald` directly if the
-adapter lives on the box) in place of the spike's `print(...)` stub.
+`mac/herald-focus.lua` is the shipped event-driven adapter: a Hammerspoon
+(`hs.window.filter` + `hs.application.watcher`) emitter that appends the
+frontmost Ghostty title to an event file the moment focus changes, which
+`scripts/focus-agent/ghostty-hammerspoon-stream.sh` tails over ssh into `herald
+curtain focus` — no polling, no per-event ssh round trip. See "Event-driven
+(Hammerspoon) adapter" above. `mac/herald-spike.lua` remains as the minimal
+Phase-0 demo.
 
 Test it over mosh without any adapter:
 
