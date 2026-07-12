@@ -58,3 +58,13 @@ test("stripTitle removes the first matching prefix and trims", () => {
   assert.equal(stripTitle("", ["[mosh] "]), "");
   assert.equal(stripTitle("No prefix", []), "No prefix");
 });
+
+test("curtain defaults carry the theme knobs", () => {
+  const c = loadConfig("/nonexistent/does-not-exist.json").curtain;
+  assert.equal(c.theme, "classic");
+  assert.deepEqual(c.themeBySession, {});
+  assert.deepEqual(c.themes, {});
+  assert.equal(c.animation.fps, 2);
+  // No global background override is defaulted (themes decide their own).
+  assert.equal(c.background, undefined);
+});
