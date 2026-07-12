@@ -68,3 +68,32 @@ test("curtain defaults carry the theme knobs", () => {
   // No global background override is defaulted (themes decide their own).
   assert.equal(c.background, undefined);
 });
+
+test("curtain focus defaults carry the event-driven adapter knobs", () => {
+  const f = loadConfig("/nonexistent/does-not-exist.json").curtain.focus;
+  assert.equal(f.source, "ssh-osascript");
+  assert.equal(f.eventFile, "$HOME/.local/state/status-herald/focus-events");
+  assert.equal(f.heartbeatSec, 20);
+});
+
+test("loadConfig honors a hammerspoon focus source override", () => {
+  const dir = mkdtempSync(join(tmpdir(), "herald-cfg-"));
+  const p = join(dir, "c.json");
+  writeFileSync(
+    p,
+    JSON.stringify({
+      curtain: {
+        focus: { source: "ghostty-hammerspoon", eventFile: "/tmp/ev" },
+      },
+    }),
+  );
+  try {
+    const f = loadConfig(p).curtain.focus;
+    assert.equal(f.source, "ghostty-hammerspoon");
+    assert.equal(f.eventFile, "/tmp/ev");
+    assert.equal(f.heartbeatSec, 20, "unset keys keep defaults");
+    assert.equal(f.terminalApp, "ghostty");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
