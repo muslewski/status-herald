@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { test } from "node:test";
-import { renderCard } from "../lib/surfaces/curtain-card.mjs";
+import { BUILTINS } from "../lib/curtain/themes.mjs";
+import { renderCard, renderCardFrame } from "../lib/surfaces/curtain-card.mjs";
 
 // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC (\x1b) is the literal byte that opens an SGR sequence; intentional.
 const plain = (s) => s.replace(/\x1b\[[0-9;]*m/g, "");
@@ -70,11 +71,40 @@ test("subagents never leak onto the DONE card, nor shells onto WORKING", () => {
   assert.doesNotMatch(working, /shell/);
 });
 
+test("compacting card announces the compaction instead of looking done", () => {
+  const text = renderCard("compacting", 0, 40, 10).map(plain).join("\n");
+  assert.match(text, /COMPACTING/);
+  assert.doesNotMatch(text, /DONE/);
+});
+
+test("done card reports how long the turn worked", () => {
+  const text = renderCard("done", 0, 60, 10, { worked: 125 })
+    .map(plain)
+    .join("\n");
+  assert.match(text, /worked 2:05/);
+  assert.match(text, /focus to open/);
+});
+
+test("done card omits the worked line when nothing was timed", () => {
+  const text = renderCard("done", 0, 60, 10, { worked: 0 })
+    .map(plain)
+    .join("\n");
+  assert.doesNotMatch(text, /worked/);
+});
+
+test("done card stacks the worked clock above the shells hint", () => {
+  const text = renderCard("done", 0, 60, 12, { worked: 90, shells: 2 })
+    .map(plain)
+    .join("\n");
+  assert.match(text, /worked 1:30/);
+  assert.match(text, /2 shells in bg/);
+});
+
 test("unknown state falls back to idle without throwing", () => {
   assert.equal(renderCard("bogus", 0, 40, 6).length, 6);
 });
 
-test("CLI render prints a clear-screen frame with WORKING", () => {
+test("CLI render repaints in place (no full-screen clear that would flicker)", () => {
   const out = execFileSync(
     "node",
     [
@@ -95,8 +125,154 @@ test("CLI render prints a clear-screen frame with WORKING", () => {
     ],
     { encoding: "utf8" },
   );
-  // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC (\x1b) is the literal byte the clear-screen sequence starts with; intentional.
-  assert.match(out, /\x1b\[2J/); // clear screen
+  // The flicker fix: home the cursor and overwrite in place rather than erase the
+  // whole screen (2J) each frame -- the 2J blanks every row before the repaint.
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC (\x1b) is the literal byte the erase-screen sequence starts with; intentional.
+  assert.doesNotMatch(out, /\x1b\[2J/); // must NOT clear the screen
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC (\x1b) is the literal byte the cursor-home sequence starts with; intentional.
+  assert.match(out, /\x1b\[H/); // homes the cursor instead
+  // Wrap is turned off around the paint so a double-width glyph cannot spill onto
+  // the next row and scroll the block (which ghosted the label as a second copy).
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC (\x1b) is the literal byte the DECAWM sequence starts with; intentional.
+  assert.match(out, /\x1b\[\?7l/); // wrap disabled
   // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC (\x1b) is the literal byte that opens an SGR/CSI sequence; intentional.
   assert.match(out.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, ""), /WORKING/);
+});
+
+test("CLI render selects the themed frame by --theme and --tick", () => {
+  const run = (theme, tick) =>
+    execFileSync(
+      "node",
+      [
+        "bin/herald",
+        "render",
+        "--surface",
+        "curtain-card",
+        "--state",
+        "working",
+        "--since",
+        "0",
+        "--cols",
+        "24",
+        "--rows",
+        "8",
+        "--theme",
+        theme,
+        "--tick",
+        String(tick),
+        "--color",
+        "always",
+      ],
+      { encoding: "utf8" },
+    )
+      // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC (\x1b) is the literal byte that opens an SGR sequence; intentional.
+      .replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "");
+  // 'classic' has no frames — WORKING is always present regardless of tick.
+  assert.match(run("classic", 0), /WORKING/);
+  assert.match(run("classic", 7), /WORKING/);
+});
+
+test("classic renderCard output is unchanged when theme/tick default", () => {
+  // The existing tests above already assert classic content; this pins that
+  // passing an explicit classic theme + tick 0 yields the same lines.
+  const implicit = renderCard("working", 42, 40, 10);
+  const explicit = renderCard("working", 42, 40, 10, {}, BUILTINS.classic, 0);
+  assert.deepEqual(explicit, implicit);
+});
+
+test("an animated theme selects its frame by tick", () => {
+  const theme = {
+    background: "transparent",
+    states: {
+      working: { fg: 33, label: "W", frames: [["AAA"], ["BBB"], ["CCC"]] },
+    },
+  };
+  const at = (tick) =>
+    renderCard("working", 0, 20, 8, {}, theme, tick).map(plain).join("\n");
+  assert.match(at(0), /AAA/);
+  assert.match(at(1), /BBB/);
+  assert.match(at(2), /CCC/);
+  assert.match(at(3), /AAA/); // wraps: tick % frames.length
+});
+
+test("art centers by its ink box on cols, ignoring baked-in indentation", () => {
+  // Every line indented 6, ink is 4 wide -> the block must center on cols/2, not
+  // sit shifted right because of the leading spaces the author happened to type.
+  const theme = {
+    background: "transparent",
+    states: {
+      working: { fg: 33, label: "W", frames: [["      ####", "      ####"]] },
+    },
+  };
+  const cols = 24;
+  const lines = renderCard("working", 0, cols, 8, {}, theme, 0).map(plain);
+  const row = lines.find((l) => l.includes("####"));
+  const lead = row.length - row.trimStart().length;
+  const center = lead + 4 / 2;
+  assert.ok(
+    Math.abs(center - cols / 2) <= 1,
+    `ink center ${center} vs ${cols / 2}`,
+  );
+});
+
+test("forge working art keeps the head centered over the anvil", () => {
+  const cols = 30;
+  const lines = renderCard("working", 0, cols, 10, {}, BUILTINS.forge, 0).map(
+    plain,
+  );
+  const inkCenter = (l) => {
+    const lead = l.length - l.trimStart().length;
+    const t = l.replace(/\s+$/, "");
+    return (lead + t.length) / 2;
+  };
+  const anvil = lines.find((l) => l.includes("======="));
+  const head = lines.find((l) => l.includes("###"));
+  assert.ok(anvil && head, "expected an anvil row and a head row in forge art");
+  assert.ok(
+    Math.abs(inkCenter(head) - inkCenter(anvil)) <= 1,
+    `head center ${inkCenter(head)} vs anvil center ${inkCenter(anvil)}`,
+  );
+});
+
+test("transparent theme paints no background fill", () => {
+  const theme = {
+    background: "transparent",
+    states: { working: { fg: 33, glyph: "●", label: "W" } },
+  };
+  const lines = renderCard("working", 0, 20, 6, {}, theme, 0);
+  // No line carries a bg SGR (40 = black bg, or 48;5;… = 256 bg).
+  for (const l of lines) {
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC (\x1b) is the literal byte that opens an SGR sequence; intentional.
+    assert.doesNotMatch(l, /\x1b\[[0-9;]*4[0-9]m/);
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC (\x1b) is the literal byte that opens an SGR sequence; intentional.
+    assert.doesNotMatch(l, /\x1b\[48;5;/);
+  }
+});
+
+test("solid theme paints a full-width background on every line", () => {
+  const lines = renderCard("working", 0, 20, 6, {}, BUILTINS.classic, 0);
+  for (const l of lines) {
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC (\x1b) is the literal byte that opens an SGR sequence; intentional.
+    assert.match(l, /\x1b\[[0-9;]*40m/); // black bg present (may follow fg codes)
+  }
+});
+
+test("renderCardFrame erases to end of line on each row (anti-ghost)", () => {
+  const theme = {
+    background: "transparent",
+    states: { done: { fg: 32, glyph: "✓", label: "DONE" } },
+  };
+  const out = renderCardFrame({
+    state: "done",
+    elapsedSec: 0,
+    cols: 20,
+    rows: 6,
+    bg: {},
+    theme,
+    tick: 0,
+  });
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC (\x1b) is the literal byte that opens an SGR sequence; intentional.
+  assert.match(out, /\x1b\[K/); // per-line erase present
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC (\x1b) is the literal byte that opens an SGR sequence; intentional.
+  assert.doesNotMatch(out, /\x1b\[2J/); // still no full-screen clear
 });

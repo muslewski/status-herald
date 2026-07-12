@@ -150,7 +150,7 @@ prints the URL.
 
 ```
 gh repo create muslewski/status-herald --public --source . --push \
-  --description "HERALD — one status line, every surface: Claude Code, tmux, and beyond. Zero-dependency Node CLI."
+  --description "HERALD — status surfaces for agent CLIs (Claude Code, Grok Build, ...) + tmux curtain. Zero-dependency Node CLI."
 gh repo edit muslewski/status-herald --add-topic statusline --add-topic status-bar \
   --add-topic tmux --add-topic claude-code --add-topic terminal --add-topic hud
 ```

@@ -4,9 +4,11 @@ import {
   TITLE_FMT,
   arm,
   armAll,
+  armIfMatch,
   cover,
   disarm,
   focus,
+  refreshCards,
   reveal,
   revealAll,
   stampFromHook,
@@ -54,6 +56,25 @@ const makeT = (init = {}) => {
           name,
           liveWin: v.opts?.["@herald_live_win"] || "",
         })),
+    // Batched readers used by focus()'s fast path: one snapshot of armed
+    // sessions, one id->name map of every window.
+    snapshotArmed: () =>
+      Object.entries(S)
+        .filter(([, v]) => v.opts?.["@herald_armed"] === "1")
+        .map(([name, v]) => ({
+          name,
+          covered: v.opts?.["@herald_covered"] === "1",
+          state: v.opts?.["@herald_state"] || "",
+          liveWin: v.opts?.["@herald_live_win"] || "",
+          activeWin: v.active ?? "",
+        })),
+    windowNames: () => {
+      const m = {};
+      for (const s of Object.keys(S))
+        for (const [id, name] of Object.entries(S[s].windows || {}))
+          m[id] = name;
+      return m;
+    },
   };
 };
 
@@ -199,6 +220,39 @@ test("focus reveals the matching title and covers the rest", () => {
   assert.equal(t.getSessOpt("s2", "@herald_covered"), "1");
 });
 
+test("focus batches its reads: one snapshot + one window map, no per-session lookups", () => {
+  const t = makeT(twoArmed());
+  let snap = 0;
+  let names = 0;
+  let perName = 0;
+  const s0 = t.snapshotArmed;
+  const n0 = t.windowNames;
+  const w0 = t.windowNameOf;
+  t.snapshotArmed = () => {
+    snap++;
+    return s0();
+  };
+  t.windowNames = () => {
+    names++;
+    return n0();
+  };
+  t.windowNameOf = (id) => {
+    perName++;
+    return w0(id);
+  };
+  focus("Syndcast Backlog", t);
+  assert.equal(snap, 1, "exactly one batched session snapshot");
+  assert.equal(names, 1, "exactly one window-name map");
+  assert.equal(
+    perName,
+    0,
+    "no per-session windowNameOf calls in the fast path",
+  );
+  // and it still did the right thing
+  assert.equal(t._S.s1.active, "@w1", "matched session revealed");
+  assert.equal(t.getSessOpt("s2", "@herald_covered"), "1", "other covered");
+});
+
 test("focus with an empty title covers all coverable sessions", () => {
   const t = makeT(twoArmed());
   focus("", t);
@@ -238,6 +292,7 @@ test("stampFromHook keeps a session WORKING when Stop leaves subagents running",
     hasTasks: true,
     subagents: 0,
     shells: 0,
+    subagentIds: [],
     ...o,
   });
   stampFromHook(
@@ -249,7 +304,7 @@ test("stampFromHook keeps a session WORKING when Stop leaves subagents running",
   assert.equal(t.getSessOpt("s1", "@herald_state"), "working");
   assert.equal(t.getSessOpt("s1", "@herald_since"), "1000");
 
-  stampFromHook("%9", ev({ subagents: 2 }), 2000, t);
+  stampFromHook("%9", ev({ subagents: 2, subagentIds: ["a", "b"] }), 2000, t);
   assert.equal(t.getSessOpt("s1", "@herald_state"), "working", "not done yet");
   assert.equal(t.getSessOpt("s1", "@herald_bg_subagents"), "2");
   assert.equal(
@@ -272,20 +327,32 @@ test("stampFromHook reports DONE with background shells still running", () => {
   assert.equal(t.getSessOpt("s1", "@herald_bg_shells"), "1");
 });
 
-test("stampFromHook leaves the counts alone for events without background_tasks", () => {
+test("stampFromHook leaves the counts alone for events without background_tasks (non start/stop)", () => {
   const t = makeT(freshSession());
   t.sessionOf = () => "s1";
   stampFromHook(
     "%9",
-    { event: "Stop", hasTasks: true, subagents: 2, shells: 0 },
+    {
+      event: "Stop",
+      hasTasks: true,
+      subagents: 2,
+      shells: 0,
+      subagentIds: ["a", "b"],
+    },
     1000,
     t,
   );
-  // SubagentStart carries no background_tasks; zeroing here would erase the
-  // subagent that was just launched.
+  // A Notification (or Stop) without hasTasks must not overwrite stored counts.
+  // (SubagentStart/Stop now correctly synthesize +1/-1.)
   stampFromHook(
     "%9",
-    { event: "SubagentStart", hasTasks: false, subagents: 0, shells: 0 },
+    {
+      event: "Notification",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      notificationType: "idle_prompt",
+    },
     1001,
     t,
   );
@@ -301,7 +368,13 @@ test("stampFromHook: idle_prompt cannot call a subagent turn done", () => {
   t.sessionOf = () => "s1";
   stampFromHook(
     "%9",
-    { event: "Stop", hasTasks: true, subagents: 3, shells: 0 },
+    {
+      event: "Stop",
+      hasTasks: true,
+      subagents: 3,
+      shells: 0,
+      subagentIds: ["a", "b", "c"],
+    },
     1000,
     t,
   );
@@ -313,6 +386,7 @@ test("stampFromHook: idle_prompt cannot call a subagent turn done", () => {
     hasTasks: false,
     subagents: 0,
     shells: 0,
+    subagentIds: [],
   };
   stampFromHook("%9", idle, 1060, t);
   assert.equal(
@@ -338,13 +412,195 @@ test("stampFromHook: idle_prompt cannot call a subagent turn done", () => {
   assert.equal(t.getSessOpt("s1", "@herald_state"), "done");
 });
 
+test("id-set: same-id SubagentStarts are idempotent, distinct ones stack", () => {
+  // A counter would double-count a re-delivered SubagentStart; a set will not.
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  const start = (id) => ({
+    event: "SubagentStart",
+    agentId: id,
+    hasTasks: false,
+    subagents: 0,
+    shells: 0,
+    subagentIds: [],
+  });
+  stampFromHook("%9", start("a1"), 1000, t);
+  stampFromHook("%9", start("a1"), 1001, t); // duplicate delivery
+  assert.equal(t.getSessOpt("s1", "@herald_bg_subagents"), "1", "dedup by id");
+  stampFromHook("%9", start("a2"), 1002, t);
+  assert.equal(t.getSessOpt("s1", "@herald_bg_subagents"), "2");
+});
+
+test("id-set: a Stop task list reconciles a leaked synthesized count", () => {
+  // Grok-style: two SubagentStarts synthesize a count of 2, but their Stops are
+  // dropped. A later authoritative Stop carrying an empty running list must
+  // overwrite the leak, not add to it -- self-healing the desync.
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  const start = (id) => ({
+    event: "SubagentStart",
+    agentId: id,
+    hasTasks: false,
+    subagents: 0,
+    shells: 0,
+    subagentIds: [],
+  });
+  stampFromHook("%9", start("g1"), 1000, t);
+  stampFromHook("%9", start("g2"), 1001, t);
+  assert.equal(t.getSessOpt("s1", "@herald_bg_subagents"), "2", "leaked to 2");
+  // Authoritative Stop, nothing actually running:
+  stampFromHook(
+    "%9",
+    { event: "Stop", hasTasks: true, subagents: 0, shells: 0, subagentIds: [] },
+    2000,
+    t,
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_bg_subagents"), "0", "reconciled");
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "done");
+});
+
+test("stampFromHook writes a heartbeat on every event", () => {
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  stampFromHook(
+    "%9",
+    { event: "Stop", hasTasks: true, subagents: 0, shells: 0, subagentIds: [] },
+    4242,
+    t,
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_last_hook"), "4242");
+});
+
+test("armIfMatch arms a session matching the glob, skips one that does not", () => {
+  const t = makeT({
+    "syndcast-10": { opts: {}, active: "@a", windows: { "@a": "Backlog" } },
+    "token-oracle": { opts: {}, active: "@b", windows: { "@b": "Oracle" } },
+  });
+  armIfMatch("syndcast-10", "syndcast-*", t);
+  armIfMatch("token-oracle", "syndcast-*", t);
+  assert.equal(t.getSessOpt("syndcast-10", "@herald_armed"), "1", "matched");
+  assert.equal(
+    t.getSessOpt("token-oracle", "@herald_armed"),
+    "",
+    "not matched",
+  );
+});
+
+test("armIfMatch on an already-armed session is a no-op (idempotent)", () => {
+  const t = makeT(freshSession());
+  arm("s1", t);
+  t._S.s1.opts["@herald_live_win"] = "@sentinel"; // must survive a re-arm attempt
+  armIfMatch("s1", "*", t);
+  assert.equal(t.getSessOpt("s1", "@herald_live_win"), "@sentinel");
+});
+
 test("arm clears stale in-flight counts", () => {
   // Otherwise a re-arm inherits a count that no event will ever drain, and
   // every future idle_prompt is held at WORKING forever.
   const t = makeT(freshSession());
   t.setSessOpt("s1", "@herald_bg_subagents", 3);
+  t.setSessOpt("s1", "@herald_worked", 999);
   arm("s1", t);
   assert.equal(t.getSessOpt("s1", "@herald_bg_subagents"), "0");
+  assert.equal(t.getSessOpt("s1", "@herald_worked"), "0");
+});
+
+test("stampFromHook freezes how long the turn worked when it reaches DONE", () => {
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  const ev = (o) => ({
+    event: "Stop",
+    agentId: "",
+    notificationType: "",
+    hasTasks: true,
+    subagents: 0,
+    shells: 0,
+    subagentIds: [],
+    ...o,
+  });
+  // Prompt starts the clock at t=1000; the turn ends at t=1125 -> worked 125s.
+  stampFromHook(
+    "%9",
+    ev({ event: "UserPromptSubmit", hasTasks: false }),
+    1000,
+    t,
+  );
+  stampFromHook("%9", ev({ event: "Stop" }), 1125, t);
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "done");
+  assert.equal(t.getSessOpt("s1", "@herald_worked"), "125");
+
+  // A later idle_prompt (still DONE) must not recompute and inflate the clock.
+  stampFromHook(
+    "%9",
+    {
+      event: "Notification",
+      notificationType: "idle_prompt",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+    },
+    9999,
+    t,
+  );
+  assert.equal(
+    t.getSessOpt("s1", "@herald_worked"),
+    "125",
+    "frozen, not ticking",
+  );
+});
+
+test("stampFromHook records no worked time when the turn was never clocked", () => {
+  // A Stop with no prior prompt (@herald_since unset) has nothing to measure.
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  stampFromHook(
+    "%9",
+    { event: "Stop", hasTasks: true, subagents: 0, shells: 0, subagentIds: [] },
+    2000,
+    t,
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_worked"), "0");
+});
+
+test("refreshCards respawns each card window without disturbing state", () => {
+  const t = makeT({
+    s1: {
+      opts: {
+        "@herald_armed": "1",
+        "@herald_live_win": "@w1",
+        "@herald_state": "done",
+        "@herald_worked": "125",
+        "@herald_covered": "1",
+      },
+      active: "@curtain",
+      windows: { "@w1": "Backlog", "@curtain": "_curtain" },
+    },
+    s2: {
+      opts: {
+        "@herald_armed": "1",
+        "@herald_live_win": "@w2",
+        "@herald_state": "working",
+        "@herald_covered": "0",
+      },
+      active: "@w2",
+      windows: { "@w2": "Run", "@curtain": "_curtain" },
+    },
+  });
+  refreshCards(t);
+  // A covered session ends up covered again; an uncovered one stays on its live
+  // window. Neither loses its state.
+  assert.equal(t._S.s1.active, "@curtain", "covered session re-covered");
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "done");
+  assert.equal(t.getSessOpt("s1", "@herald_worked"), "125", "state preserved");
+  assert.equal(t.getSessOpt("s1", "@herald_covered"), "1");
+  assert.equal(
+    t._S.s2.active,
+    "@w2",
+    "uncovered session left on its live window",
+  );
+  assert.equal(t.getSessOpt("s2", "@herald_state"), "working");
+  assert.equal(t._S.s2.windows["@curtain"], "_curtain", "card recreated");
 });
 
 test("stampFromHook is a no-op outside tmux", () => {
@@ -381,4 +637,26 @@ test("armAll with * arms all", () => {
   armAll("*", t);
   assert.equal(t.getSessOpt("s1", "@herald_armed"), "1");
   assert.equal(t.getSessOpt("s2", "@herald_armed"), "1");
+});
+
+test("arm stores the resolved theme name and frame interval", () => {
+  // Inject an explicit config so the assertion does not depend on the real user
+  // config file (which the user retunes -- e.g. a fleet-wide forge default).
+  const t = makeT(freshSession());
+  arm("s1", t, {});
+  assert.equal(t.getSessOpt("s1", "@herald_theme"), "classic");
+  assert.equal(t.getSessOpt("s1", "@herald_frame_ms"), "1000", "static -> 1s");
+});
+
+test("arm stamps an animated theme's faster frame interval", () => {
+  const t = makeT(freshSession());
+  arm("s1", t, { theme: "forge" });
+  assert.equal(t.getSessOpt("s1", "@herald_theme"), "forge");
+  assert.equal(t.getSessOpt("s1", "@herald_frame_ms"), "500", "2 fps default");
+});
+
+test("arm honors a themeBySession glob over the global default", () => {
+  const t = makeT(freshSession());
+  arm("s1", t, { theme: "classic", themeBySession: { "s*": "forge" } });
+  assert.equal(t.getSessOpt("s1", "@herald_theme"), "forge");
 });

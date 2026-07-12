@@ -77,6 +77,37 @@ test("parseHookPayload excludes the reporting subagent from its own in-flight li
   assert.equal(p.subagents, 0, "own agent must not count as in flight");
 });
 
+test("parseHookPayload accepts Grok/camelCase payload shape (hookEventName, notificationType, no background_tasks)", () => {
+  const p = parseHookPayload(
+    JSON.stringify({
+      hookEventName: "Notification",
+      notificationType: "approval_required",
+    }),
+  );
+  assert.equal(p.event, "Notification");
+  assert.equal(p.notificationType, "permission_prompt");
+  assert.equal(p.hasTasks, false);
+});
+
+test("parseHookPayload accepts Grok Stop and Subagent* variants; falls back on env", () => {
+  const p1 = parseHookPayload(JSON.stringify({ hookEventName: "Stop" }));
+  assert.equal(p1.event, "Stop");
+  const p2 = parseHookPayload(
+    JSON.stringify({ hookEventName: "subagentStart" }),
+  );
+  assert.equal(p2.event, "SubagentStart");
+  // env fallback when no field (rare)
+  const old = process.env.GROK_HOOK_EVENT;
+  try {
+    process.env.GROK_HOOK_EVENT = "UserPromptSubmit";
+    const p3 = parseHookPayload("{}");
+    assert.equal(p3?.event, "UserPromptSubmit");
+  } finally {
+    if (old === undefined) process.env.GROK_HOOK_EVENT = undefined;
+    else process.env.GROK_HOOK_EVENT = old;
+  }
+});
+
 test("a user prompt starts work and restarts the clock", () => {
   assert.equal(
     nextState(STATES.IDLE, ev({ event: "UserPromptSubmit" })),
@@ -203,15 +234,124 @@ test("idle_prompt must never clear a pending permission prompt", () => {
   assert.equal(nextState(STATES.NEEDS, n), STATES.NEEDS);
 });
 
-test("an unknown notification surfaces rather than hides", () => {
-  const n = ev({ event: "Notification", notificationType: "something_new" });
+test("an informational notification never hijacks a working card", () => {
+  // The bug: Grok fires `task_complete` every time a background task finishes
+  // (~470/day on executor sessions like token-oracle and agentic-sage); a push
+  // the agent SENT and any unrecognized ping are the same kind of thing. None of
+  // them means "blocked on you", so none may flip a session off what it is doing.
+  for (const notificationType of [
+    "task_complete",
+    "push_notification",
+    "something_new",
+  ]) {
+    const n = ev({ event: "Notification", notificationType });
+    assert.equal(
+      nextState(STATES.WORKING, n),
+      STATES.WORKING,
+      notificationType,
+    );
+    assert.equal(nextState(STATES.DONE, n), STATES.DONE, notificationType);
+  }
+});
+
+test("Grok task_complete does not raise a false NEEDS while working", () => {
+  // End to end through parseHookPayload, the Grok camelCase shape observed live.
+  const p = parseHookPayload(
+    JSON.stringify({
+      hookEventName: "notification",
+      notificationType: "task_complete",
+    }),
+  );
+  assert.equal(p.event, "Notification");
+  assert.equal(p.notificationType, "task_complete");
+  assert.equal(nextState(STATES.WORKING, p), STATES.WORKING);
+});
+
+test("a surfaced agent error still asks for you", () => {
+  const n = ev({ event: "Notification", notificationType: "agent_error" });
   assert.equal(nextState(STATES.WORKING, n), STATES.NEEDS);
+});
+
+test("Grok approval_required notification maps to NEEDS", () => {
+  // The approval_required -> permission_prompt mapping lives in parseHookPayload,
+  // so the mapping has to be exercised through it (the real hook path always is).
+  const p = parseHookPayload(
+    JSON.stringify({
+      hookEventName: "notification",
+      notificationType: "approval_required",
+    }),
+  );
+  assert.equal(p.notificationType, "permission_prompt");
+  assert.equal(nextState(STATES.WORKING, p), STATES.NEEDS);
 });
 
 test("an unknown event leaves the state alone", () => {
   assert.equal(
-    nextState(STATES.WORKING, ev({ event: "PreCompact" })),
+    nextState(STATES.WORKING, ev({ event: "PreToolUse" })),
     STATES.WORKING,
+  );
+});
+
+test("PostToolUse clears a stale NEEDS/COMPACTING/DONE back to working", () => {
+  // Claude Code fires no event when a block clears -- the tool the agent ran is
+  // the only proof it is active again. A permission_prompt that set NEEDS, a
+  // PreCompact that set COMPACTING, or a DONE the turn has since moved past all
+  // clear to WORKING on the next tool.
+  const t = ev({ event: "PostToolUse" });
+  assert.equal(nextState(STATES.NEEDS, t), STATES.WORKING);
+  assert.equal(nextState(STATES.COMPACTING, t), STATES.WORKING);
+  assert.equal(nextState(STATES.DONE, t), STATES.WORKING);
+});
+
+test("PostToolUse normalizes from Claude snake and camelCase shapes", () => {
+  assert.equal(
+    parseHookPayload(JSON.stringify({ hook_event_name: "PostToolUse" })).event,
+    "PostToolUse",
+  );
+  assert.equal(
+    parseHookPayload(JSON.stringify({ hookEventName: "post_tool_use" })).event,
+    "PostToolUse",
+  );
+});
+
+test("PostToolUse does not restart the elapsed clock", () => {
+  // Only a new user prompt resets the wait timer; tools within a turn keep it.
+  assert.equal(resetsElapsed(ev({ event: "PostToolUse" })), false);
+});
+
+test("PreCompact shows the session as compacting, not finished", () => {
+  // Compaction is real work with no live output. Before this, no event moved the
+  // card, so a session compacting after a turn sat on DONE and looked ready.
+  assert.equal(
+    nextState(STATES.DONE, ev({ event: "PreCompact" })),
+    STATES.COMPACTING,
+  );
+  assert.equal(
+    nextState(STATES.WORKING, ev({ event: "PreCompact" })),
+    STATES.COMPACTING,
+  );
+});
+
+test("parseHookPayload normalizes the PreCompact event name", () => {
+  assert.equal(
+    parseHookPayload(payload({ hook_event_name: "PreCompact" })).event,
+    "PreCompact",
+  );
+  // Grok/snake spelling, should it ever fire one.
+  assert.equal(
+    parseHookPayload(JSON.stringify({ hookEventName: "pre_compact" })).event,
+    "PreCompact",
+  );
+});
+
+test("a completing turn drains COMPACTING back to DONE", () => {
+  // The end-marker after compaction (idle_prompt when it ends, or the resumed
+  // turn's Stop) must move it on, so COMPACTING never sticks.
+  const idle = ev({ event: "Notification", notificationType: "idle_prompt" });
+  assert.equal(nextState(STATES.COMPACTING, idle), STATES.DONE);
+  assert.equal(
+    nextState(STATES.COMPACTING, ev({ event: "Stop" })),
+    STATES.DONE,
   );
 });
 

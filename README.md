@@ -4,32 +4,49 @@ Heads-up engine for terminal status surfaces.
 
 ## Curtain (phase 1)
 
-Covers a working Claude Code pane in a tmux grid with an opaque status card;
-focus a card to open the live session.
+Covers a working agent session pane (Claude Code, Grok Build, etc.) in a tmux
+grid with an opaque status card; focus a card to open the live session.
 
 ### Install
 
 ```bash
 npm install            # dev deps only (biome); zero runtime deps
 npm link               # put `herald` on PATH
-herald curtain install # wire Claude Code hooks into ~/.claude/settings.json
+herald curtain install # wire hooks (into ~/.claude/settings.json for Claude + Grok compat)
 ```
 
-`install` wires one command, `herald curtain hook`, onto `UserPromptSubmit`,
+`install` wires one payload-aware command onto `UserPromptSubmit`,
 `SubagentStart`, `SubagentStop`, `Stop` and `Notification`, and removes the
 older `herald curtain event <state>` hooks if it finds them. Already-running
-Claude Code sessions pick the change up at their next hook event — no restart
-needed (measured on 2.1.205: a session started 1h44m earlier ran the new
-command 96s after install). Existing curtain windows do need a re-arm
-(`herald curtain disarm <s> && herald curtain arm <s>`) to render the new
-subagent/shell annotations.
+sessions pick the change up at their next hook event — no restart needed.
+
+The wired command is **absolute** — `"<node>" "<…/bin/herald>" curtain hook`,
+resolved from the node running `install`. A hook fires in whatever environment
+the agent hands it (Grok's standalone binary, a non-login shell, a
+systemd-spawned session), and a bare `herald` exits 127 there before any code
+runs — silently, because hooks fail open. That is why the card used to freeze
+for Grok and for some Claude tabs. `install` migrates any bare or stale wiring
+to the absolute form and re-resolves it, so a node upgrade self-heals on the
+next `install`. Run `herald curtain doctor` to confirm the wired command
+resolves; `herald curtain inspect` shows each session's state, in-flight
+counts, and how long ago its last hook landed.
+
+For native Grok (no .claude dir):
+```bash
+herald curtain install grok   # or --grok
+# writes ~/.grok/hooks/herald.json (Grok loads global hooks from here)
+```
+
+Grok also reads `~/.claude/settings.json` via compatibility layer, so the
+default `install` gives working tmux cards for Grok sessions too.
 
 ### Use
 
 ```bash
-herald curtain up --slots 2 --cmd claude   # build the grid on Manjaro
+herald curtain up --slots 2 --cmd claude   # Claude grid
+herald curtain up --slots 2 --cmd grok     # Grok Build grid
 # from the Mac: ssh manjaro -t 'tmux attach -t grid'
-herald curtain doctor                      # verify wiring
+herald curtain doctor                      # verify wiring (checks claude + grok)
 herald curtain down                        # tear down
 ```
 
@@ -38,35 +55,43 @@ finished panes show `✅ DONE`; blocked panes show `⚠ NEEDS YOU`. Click a card
 to reveal the live session; click away to re-cover it while it is still
 working.
 
+Grok users: the same cards work. `herald curtain hook` normalizes Grok's
+`hookEventName` / `approval_required` payloads (and synthesizes sub counts
+from SubagentStart/Stop if no background_tasks present). 
+
 ### What the card knows about subagents
 
-A Claude Code session is a main agent plus whatever subagents and background
-shells it has dispatched, so "the turn ended" and "the work finished" are not
-the same event. Claude Code's `Stop` hook means the first one: it fires once
-per user prompt, even while `background_tasks` still lists running work, and
-it never fires again when a completing task wakes the agent back up.
+An agent session (Claude Code, Grok Build, ...) is a main agent plus whatever
+subagents and background shells it has dispatched, so "the turn ended" and
+"the work finished" are not the same event. `Stop` typically means the main
+turn ended (even with work still running).
 
 `herald curtain hook` therefore reads each hook's stdin payload rather than
-trusting its name:
+trusting its name (and normalizes Claude `hook_event_name` + Grok
+`hookEventName`, `permission_prompt`/`approval_required`, etc.):
 
 - **subagents still running** at `Stop` → stays `● WORKING · 2 subagents`,
   because a subagent keeps the main agent busy and you cannot act yet.
 - **background shells still running** at `Stop` → `✅ DONE · 1 shell in bg`.
   A CI watch or a long build does not hold you up; the card just says so.
-- `Notification` splits on `notification_type`: a `permission_prompt` is
-  `⚠ NEEDS YOU`, an `idle_prompt` is `✅ DONE` — but an `idle_prompt` never
-  overrides a permission prompt that is still waiting on you, and never calls
-  a session done while its subagents are still running. A `Notification`
-  payload carries no `background_tasks` at all, so that last rule reads the
-  counts stored by the last event that did carry them. "The main agent is
+- `Notification` splits on `notification_type` (or `notificationType`):
+  a `permission_prompt` (or Grok `approval_required`) is `⚠ NEEDS YOU`,
+  an `idle_prompt` is `✅ DONE` — but an `idle_prompt` never overrides a
+  permission prompt that is still waiting on you, and never calls a session
+  done while its subagents are still running. A `Notification` payload carries
+  no `background_tasks` at all, so that last rule reads the counts stored by
+  the last event (or synthesized from Subagent* for Grok). "The main agent is
   idle" is exactly what a main agent looks like while it waits on subagents.
 
 One caveat, by design: a turn resumed by its finishing subagents emits no
-second `Stop`, so the card holds `WORKING` until Claude Code's idle
-notification lands (~60s) *and* the subagent count has drained to zero. Being
-a minute late to `DONE` beats being a minute early, which is what sends you to
-a tab that is still working. `UserPromptSubmit` and `arm` both zero the
-counts, so a count that somehow never drains cannot strand a card forever.
+second `Stop`, so the card holds `WORKING` until the idle notification lands
+(~60s) *and* the subagent count has drained to zero. Being a minute late to
+`DONE` beats being a minute early, which is what sends you to a tab that is
+still working. `UserPromptSubmit` and `arm` both zero the counts, so a count
+that somehow never drains cannot strand a card forever.
+
+For Grok, sub counts are synthesized from SubagentStart/Stop when the payload
+lacks `background_tasks`. Full fidelity for Claude; good approx for Grok.
 
 Grind Mode (Mac idle-nag) is phase 2 — separate spec.
 
@@ -157,6 +182,49 @@ The `curtain` block, with its defaults:
 - `autoArm.enabled` / `autoArm.sessionGlob` — whether `herald curtain arm-all`
   is allowed to run, and which tmux sessions it arms (`*` = all,
   `prefix*` = glob-matched, or an exact name).
+
+### Curtain themes
+
+Themes control the card's look. Pick a default and bind themes to sessions by
+name glob:
+
+```json
+{
+  "curtain": {
+    "theme": "minimal",
+    "themeBySession": {
+      "token-oracle*": "forge",
+      "syndcast*": "minimal"
+    },
+    "animation": { "fps": 2 }
+  }
+}
+```
+
+Built-ins: `classic` (solid black, the default), `minimal` (transparent —
+your terminal background shows through), `forge` (transparent + animated art).
+Author your own under `curtain.themes.<name>`:
+
+```json
+{
+  "curtain": {
+    "theme": "mine",
+    "themes": {
+      "mine": {
+        "background": "transparent",
+        "states": {
+          "working": { "fg": 33, "label": "WORKING",
+            "frames": [["  >>>  "], ["  >>>> "]] }
+        }
+      }
+    }
+  }
+}
+```
+
+`frames` is an array of frames; each frame is an array of lines. A single-frame
+state is static. Paste art from `figlet`/`toilet` or draw your own. After
+changing a theme, run `herald curtain refresh` to reach already-armed sessions.
 
 ### ssh-poll quickstart
 

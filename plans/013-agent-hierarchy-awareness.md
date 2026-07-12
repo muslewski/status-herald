@@ -2,11 +2,11 @@
 
 **Status**: curtain half DONE (shipped); statusline + tmux-bar halves TODO.
 
-A Claude Code session is not one agent. It is a main agent plus a changing
-set of subagents and background shells. Every HERALD surface currently
-renders as if it were one agent, and every one of them is wrong in the same
-way. The curtain's failure was the visible one; the statusline and tmux bar
-will fail identically once they ship.
+An agent session (Claude Code, Grok Build, etc.) is not one agent. It is a
+main agent plus a changing set of subagents and background shells. The curtain
+(now generalized) uses hook payloads (or synthesized counts) so that
+`● WORKING` vs `✅ DONE` is accurate across agents. Statusline/tmux-bar
+halves follow the same normalized model.
 
 ## The evidence (measured, not assumed)
 
@@ -64,6 +64,116 @@ Session-scoped tmux options: `@herald_state`, `@herald_since`,
 `idle_prompt` fires (~60s after it truly goes idle). Being 60s late to DONE
 is strictly better than being 60s early — early is what sent you to a tab
 that was still working. Revisit if Claude Code ever ships a turn-start hook.
+
+## Shipped: reliability hardening (2026-07-10)
+
+The curtain worked for some Claude sessions and not others, and not for Grok at
+all. Root-caused with a deterministic reproduction, not a guess:
+
+| Claim | Proof |
+|---|---|
+| The hook was wired as the bare token `herald curtain hook` | both `~/.claude/settings.json` and `~/.grok/hooks/herald.json` |
+| A bare command fails in a stripped hook environment | `env -i PATH=/usr/bin:/bin sh -c 'herald curtain hook'` → **exit 127** |
+| The absolute form works there | `"<node>" "<bin/herald>" curtain hook` under the same env → **exit 0**, full hook body runs |
+| Every other tool in the same hook arrays already wires absolute node | token-forecast, sage: `"/abs/node" "/abs/script"` |
+
+`herald` resolves only via nvm's shim dir. Grok's standalone binary and some
+Claude launch contexts (non-login shell, systemd, mosh) do not carry it, so the
+hook exited 127 before any code ran — and because hooks fail open, silently. The
+card then froze on whatever state it last saw.
+
+**Fixes shipped:**
+
+- **Absolute wiring** (`lib/curtain/install.mjs`): `install` resolves the running
+  node's `execPath` + this package's `bin/herald` and writes
+  `"<node>" "<bin/herald>" curtain hook`. It migrates any prior wiring — bare, or
+  stale-absolute from a past node — so re-running install self-heals a node
+  upgrade. tmux still resolves from `/usr/bin`, unaffected.
+- **`doctor` resolution check**: reports per host whether the wired command is
+  absolute, on disk, and current — turning the silent 127 into a visible ✗.
+- **id-set subagent tracking** (`lib/curtain/session.mjs`): subagents are a SET of
+  ids (`@herald_bg_subagent_ids`), not an integer. A counter lost an increment
+  when a main agent dispatched several subagents at once and never drained a
+  leak; a set is idempotent and `Stop`'s task list overwrites it, so any desync
+  self-heals at the next turn end.
+- **Heartbeat + inspect + capture** (`lib/curtain/debug.mjs`, `herald curtain
+  inspect`): every hook stamps `@herald_last_hook`; `inspect` shows per-session
+  state, in-flight counts, and heartbeat age; `HERALD_CURTAIN_DEBUG` or a
+  `capture.on` sentinel logs raw payloads so a host's real shape is captured, not
+  guessed.
+
+Verification: hook fired live through the new wiring (`inspect` showed
+`last-hook=68s ago` on a session whose agent never restarted); the full hook body
+ran under `env -i PATH=/usr/bin:/bin` where the bare command gave 127.
+
+## Grok payload shape (measured 2026-07-10, no longer a guess)
+
+Captured from a live Grok Build session via the capture sentinel above:
+
+```
+keys: hookEventName, sessionId, cwd, workspaceRoot, timestamp,
+      transcriptPath, promptId, reason|prompt
+hookEventName: "stop" | "user_prompt_submit"   (camelCase KEY, snake_lower VALUE)
+background_tasks: ABSENT on Stop
+notification_type: absent in the samples seen
+```
+
+So on Grok: `normalizeEventName` maps the snake-lower values correctly, `Stop`
+carries no task list (the id-set synthesis from `SubagentStart`/`SubagentStop` is
+the only subagent path), and basic WORKING/DONE is confirmed working live. Still
+unobserved and therefore still best-effort: whether Grok emits `subagent_start`/
+`subagent_stop`/`notification` at all. Re-enable capture on a Grok run that
+dispatches subagents to settle it.
+
+## Shipped: compaction state + worked clock + flicker (2026-07-11)
+
+Three operator-reported gaps, root-caused from the recorded event log:
+
+1. **Compaction read as DONE.** `PreCompact` is a real Claude Code hook (fires
+   with `trigger: manual|auto`), but it was not in `EVENTS`, so herald never
+   observed a compaction — the card sat on the previous turn's DONE for the whole
+   minute it ran. Fixed by wiring `PreCompact` and adding a `COMPACTING` state
+   (`⟳ COMPACTING`). It is coverable, and the next event drains it: `idle_prompt`
+   when compaction ends, or the resumed turn's `Stop`. `stampFromHook` preserves
+   the in-flight set across it, so an auto-compact mid-turn does not lose counts.
+
+2. **No "worked" duration on DONE.** `@herald_since` keeps ticking after a turn
+   ends, so it could not be shown as a finish time. Now `stampFromHook` freezes
+   `@herald_worked = now - since` on the transition *into* DONE only (a later
+   `idle_prompt` must not recompute and inflate it), and the DONE card stacks
+   `worked m:ss` above the focus hint. `arm` clears it with the other counts.
+
+3. **Row flicker.** `renderCardFrame` prepended `\x1b[2J` (full-screen erase)
+   every 1s frame: the screen blanked, then the text drew back in. Replaced with
+   home-cursor (`\x1b[H`) + overwrite-in-place + erase-below (`\x1b[J`) — an
+   unchanged cell is rewritten with its own value, so nothing visibly flickers.
+
+Rollout note: the render-path fixes (flicker, COMPACTING card) reach existing
+card windows automatically — `herald` symlinks into the repo and the loop re-runs
+`herald render` each tick. The `worked` line needs the loop itself respawned
+(it reads the card script once at window creation), so `curtain refresh` respawns
+each card window in place, preserving every `@herald_*` option and re-covering a
+covered session. Non-destructive: only the hidden `_curtain` window is replaced.
+
+Two follow-ups from the same operator, same day:
+
+4. **Doubled label ("DONE" twice, one below the other).** Once 2J was gone, the
+   `✅` glyph exposed a latent bug: `padCenter` measures width by codepoint, but
+   `✅` is two terminal cells, so its row was one cell too wide and wrapped, which
+   scrolled the block and left the old label as a ghost. `renderCardFrame` now
+   brackets the paint with wrap off/on (`\x1b[?7l` / `\x1b[?7h`, DECAWM) so an
+   over-wide row is clipped at the margin instead of wrapping -- the technique
+   real full-screen TUIs use, and it covers any wide glyph, not just this one.
+
+5. **False NEEDS YOU while still working.** `nextState`'s `Notification` arm
+   defaulted every unrecognized type to NEEDS. Grok fires `task_complete` when a
+   background task finishes -- 470 in three days across executor sessions
+   (token-oracle, agentic-sage/muslewski-v3) -- and each one flipped a working
+   card to a false "needs you". Corrected the model: NEEDS means *blocked on the
+   user* and comes only from a permission/approval prompt (or a surfaced
+   `agent_error`); `idle_prompt` stays the end-marker; `task_complete`,
+   `push_notification`, and anything unrecognized are informational and return
+   `cur`. The real WORKING/DONE call is Stop + subagent counts, never a status ping.
 
 ## TODO: statusline (Plan 005 surface)
 

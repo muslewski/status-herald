@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildArgs, parseFocus } from "../lib/curtain/tmux.mjs";
+import {
+  buildArgs,
+  parseFocus,
+  parseSnapshot,
+  parseWindowMap,
+} from "../lib/curtain/tmux.mjs";
 
 test("buildArgs.setOpt targets the pane", () => {
   assert.deepEqual(buildArgs.setOpt("%5", "@herald_state", "working"), [
@@ -93,4 +98,75 @@ test("buildArgs.unsetSessOpt clears a session option with -u", () => {
     "syndcast",
     "set-titles-string",
   ]);
+});
+
+test("buildArgs.snapshot lists sessions with the curtain-state format", () => {
+  const a = buildArgs.snapshot();
+  assert.equal(a[0], "list-sessions");
+  assert.equal(a[1], "-F");
+  // One tab-joined format carrying everything focus() needs per session.
+  for (const f of [
+    "#{session_name}",
+    "#{@herald_armed}",
+    "#{@herald_covered}",
+    "#{@herald_state}",
+    "#{@herald_live_win}",
+    "#{window_id}",
+  ])
+    assert.ok(a[2].includes(f), `format missing ${f}`);
+  assert.equal(a[2].split("\t").length, 6, "six tab-separated fields");
+});
+
+test("buildArgs.windowMap lists every window id and name across sessions", () => {
+  assert.deepEqual(buildArgs.windowMap(), [
+    "list-windows",
+    "-a",
+    "-F",
+    "#{window_id}\t#{window_name}",
+  ]);
+});
+
+test("parseSnapshot keeps only armed sessions and splits their fields", () => {
+  const raw = [
+    "hermes\t1\t1\tworking\t@22\t@98",
+    "token-oracle\t1\t0\tdone\t@41\t@41",
+    "token-oracle-2\t\t\t\t\t@81", // not armed -> dropped
+  ].join("\n");
+  assert.deepEqual(parseSnapshot(raw), [
+    {
+      name: "hermes",
+      covered: true,
+      state: "working",
+      liveWin: "@22",
+      activeWin: "@98",
+    },
+    {
+      name: "token-oracle",
+      covered: false,
+      state: "done",
+      liveWin: "@41",
+      activeWin: "@41",
+    },
+  ]);
+});
+
+test("parseSnapshot returns [] for empty or missing input", () => {
+  assert.deepEqual(parseSnapshot(""), []);
+  assert.deepEqual(parseSnapshot(null), []);
+});
+
+test("parseWindowMap builds an id->name map, names may hold spaces", () => {
+  const raw =
+    "@22\tHermes\n@39\tagentic sage\n@37\tSyndcast ADVISOR PLANS\n@98\t_curtain";
+  assert.deepEqual(parseWindowMap(raw), {
+    "@22": "Hermes",
+    "@39": "agentic sage",
+    "@37": "Syndcast ADVISOR PLANS",
+    "@98": "_curtain",
+  });
+});
+
+test("parseWindowMap returns {} for empty or missing input", () => {
+  assert.deepEqual(parseWindowMap(""), {});
+  assert.deepEqual(parseWindowMap(null), {});
 });

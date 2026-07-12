@@ -8,12 +8,11 @@ starting, honor its STOP conditions, and update your row when done.
 
 **What this project is**: **HERALD** — *Heads-up Engine for Rendering
 Adaptive Line Displays* (npm: `status-herald`, binary: `herald`). One
-convention and one zero-dependency Node CLI for rendering bottom status
-bars across terminal hosts: Claude Code's `statusLine`, tmux's
-status-right, and later zellij/kitty. Installed globally, configured
-per-project (presets keyed by repo identity). Ships presets for
-token-oracle forecasts/alerts, agentic-sage session/fleet info, and a
-stoic-quote bar.
+convention and one zero-dependency Node CLI for rendering status surfaces
+across terminal hosts and agents: Claude Code `statusLine`/hooks, Grok Build
+hooks + TUI-in-tmux, tmux curtain/status-right, and later zellij/kitty.
+Installed globally, configured per-project. Supports agent-agnostic curtain
+cards for tmux (● WORKING etc).
 
 **Source anchors** (external contracts these plans excerpt; re-verify on
 drift): token-oracle @ `ada32e9`, agentic-sage @ `cffd055`, Claude Code
@@ -40,6 +39,7 @@ invariant.
 | 011 | Open-source launch: GitHub remote, npm publish, install paths | P2 | M | 001 (Part A); 001–009 (Part B) | TODO |
 | 012 | Website brand brief: HERALD voice, positioning, family contrast | P3 | M | — | TODO |
 | 013 | Agent-hierarchy awareness (curtain shipped; statusline + tmux bar) | P1 | M | 005 | IN PROGRESS |
+| 014 | Curtain themes, per-session binding, animated ASCII art, transparent bg | P2 | M | 005, 013 | DONE |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
 REJECTED (with one-line rationale)
