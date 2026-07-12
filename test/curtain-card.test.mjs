@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { test } from "node:test";
-import { renderCard } from "../lib/surfaces/curtain-card.mjs";
+import { BUILTINS } from "../lib/curtain/themes.mjs";
+import { renderCard, renderCardFrame } from "../lib/surfaces/curtain-card.mjs";
 
 // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC (\x1b) is the literal byte that opens an SGR sequence; intentional.
 const plain = (s) => s.replace(/\x1b\[[0-9;]*m/g, "");
@@ -136,4 +137,70 @@ test("CLI render repaints in place (no full-screen clear that would flicker)", (
   assert.match(out, /\x1b\[\?7l/); // wrap disabled
   // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC (\x1b) is the literal byte that opens an SGR/CSI sequence; intentional.
   assert.match(out.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, ""), /WORKING/);
+});
+
+test("classic renderCard output is unchanged when theme/tick default", () => {
+  // The existing tests above already assert classic content; this pins that
+  // passing an explicit classic theme + tick 0 yields the same lines.
+  const implicit = renderCard("working", 42, 40, 10);
+  const explicit = renderCard("working", 42, 40, 10, {}, BUILTINS.classic, 0);
+  assert.deepEqual(explicit, implicit);
+});
+
+test("an animated theme selects its frame by tick", () => {
+  const theme = {
+    background: "transparent",
+    states: {
+      working: { fg: 33, label: "W", frames: [["AAA"], ["BBB"], ["CCC"]] },
+    },
+  };
+  const at = (tick) =>
+    renderCard("working", 0, 20, 8, {}, theme, tick).map(plain).join("\n");
+  assert.match(at(0), /AAA/);
+  assert.match(at(1), /BBB/);
+  assert.match(at(2), /CCC/);
+  assert.match(at(3), /AAA/); // wraps: tick % frames.length
+});
+
+test("transparent theme paints no background fill", () => {
+  const theme = {
+    background: "transparent",
+    states: { working: { fg: 33, glyph: "●", label: "W" } },
+  };
+  const lines = renderCard("working", 0, 20, 6, {}, theme, 0);
+  // No line carries a bg SGR (40 = black bg, or 48;5;… = 256 bg).
+  for (const l of lines) {
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC (\x1b) is the literal byte that opens an SGR sequence; intentional.
+    assert.doesNotMatch(l, /\x1b\[[0-9;]*4[0-9]m/);
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC (\x1b) is the literal byte that opens an SGR sequence; intentional.
+    assert.doesNotMatch(l, /\x1b\[48;5;/);
+  }
+});
+
+test("solid theme paints a full-width background on every line", () => {
+  const lines = renderCard("working", 0, 20, 6, {}, BUILTINS.classic, 0);
+  for (const l of lines) {
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC (\x1b) is the literal byte that opens an SGR sequence; intentional.
+    assert.match(l, /\x1b\[[0-9;]*40m/); // black bg present (may follow fg codes)
+  }
+});
+
+test("renderCardFrame erases to end of line on each row (anti-ghost)", () => {
+  const theme = {
+    background: "transparent",
+    states: { done: { fg: 32, glyph: "✓", label: "DONE" } },
+  };
+  const out = renderCardFrame({
+    state: "done",
+    elapsedSec: 0,
+    cols: 20,
+    rows: 6,
+    bg: {},
+    theme,
+    tick: 0,
+  });
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC (\x1b) is the literal byte that opens an SGR sequence; intentional.
+  assert.match(out, /\x1b\[K/); // per-line erase present
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC (\x1b) is the literal byte that opens an SGR sequence; intentional.
+  assert.doesNotMatch(out, /\x1b\[2J/); // still no full-screen clear
 });
