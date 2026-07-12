@@ -39,7 +39,7 @@ invariant.
 | 011 | Open-source launch: GitHub remote, npm publish, install paths | P2 | M | 001 (Part A); 001–009 (Part B) | TODO |
 | 012 | Website brand brief: HERALD voice, positioning, family contrast | P3 | M | — | TODO |
 | 013 | Agent-hierarchy awareness (curtain shipped; statusline + tmux bar) | P1 | M | 005 | IN PROGRESS |
-| 014 | Curtain themes, per-session binding, animated ASCII art, transparent bg | P2 | M | 005, 013 | SPEC |
+| 014 | Curtain themes, per-session binding, animated ASCII art, transparent bg | P2 | M | 005, 013 | DONE |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
 REJECTED (with one-line rationale)

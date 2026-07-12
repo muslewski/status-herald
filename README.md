@@ -183,6 +183,49 @@ The `curtain` block, with its defaults:
   is allowed to run, and which tmux sessions it arms (`*` = all,
   `prefix*` = glob-matched, or an exact name).
 
+### Curtain themes
+
+Themes control the card's look. Pick a default and bind themes to sessions by
+name glob:
+
+```json
+{
+  "curtain": {
+    "theme": "minimal",
+    "themeBySession": {
+      "token-oracle*": "forge",
+      "syndcast*": "minimal"
+    },
+    "animation": { "fps": 2 }
+  }
+}
+```
+
+Built-ins: `classic` (solid black, the default), `minimal` (transparent —
+your terminal background shows through), `forge` (transparent + animated art).
+Author your own under `curtain.themes.<name>`:
+
+```json
+{
+  "curtain": {
+    "theme": "mine",
+    "themes": {
+      "mine": {
+        "background": "transparent",
+        "states": {
+          "working": { "fg": 33, "label": "WORKING",
+            "frames": [["  >>>  "], ["  >>>> "]] }
+        }
+      }
+    }
+  }
+}
+```
+
+`frames` is an array of frames; each frame is an array of lines. A single-frame
+state is static. Paste art from `figlet`/`toilet` or draw your own. After
+changing a theme, run `herald curtain refresh` to reach already-armed sessions.
+
 ### ssh-poll quickstart
 
 The reference adapter (`scripts/focus-agent/ghostty-ssh-poll.sh`) is plain

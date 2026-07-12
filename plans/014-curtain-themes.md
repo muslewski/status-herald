@@ -1,7 +1,15 @@
 # Plan 014 — Curtain themes, profiles, and animated ASCII art
 
-**Status**: SPEC (brainstormed 2026-07-11, fusion-advisor: Opus + Grok xhigh).
-Ready for writing-plans.
+**Status**: DONE (shipped).
+
+Shipped 2026-07-11.
+
+The curtain card works but its look is hardcoded: one centered glyph + label +
+subtitle on a solid black fill, colored from ~16 named ANSI colors. This plan
+makes the *look* data-driven — themes, per-session binding, a transparent
+background that lets the terminal's own background (Ghostty) show through, and
+per-state ASCII art that can animate — **without adding a runtime dependency or
+a font renderer**, and without changing behavior for anyone who does nothing.
 
 The curtain card works but its look is hardcoded: one centered glyph + label +
 subtitle on a solid black fill, colored from ~16 named ANSI colors. This plan
