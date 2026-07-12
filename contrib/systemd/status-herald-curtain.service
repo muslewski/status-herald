@@ -1,5 +1,5 @@
 [Unit]
-Description=status-herald per-tab curtain focus agent (ssh poll)
+Description=status-herald per-tab curtain focus agent (dispatcher: poll or event stream)
 After=network-online.target
 
 [Service]
@@ -9,7 +9,7 @@ Type=simple
 # both into ~/.local/bin, or uncomment and adjust the line below.
 #Environment=PATH=%h/.nvm/versions/node/v22.12.0/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
 ExecStartPre=/usr/bin/env herald curtain arm-all
-ExecStart=/usr/bin/env bash %h/.local/share/status-herald/ghostty-ssh-poll.sh
+ExecStart=/usr/bin/env bash %h/.local/share/status-herald/run.sh
 # SIGTERM kills the poll loop before its trailing reveal-all can run. Without
 # this, stopping the service leaves every covered session behind its card.
 ExecStopPost=/usr/bin/env herald curtain reveal-all
