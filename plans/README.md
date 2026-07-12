@@ -40,6 +40,7 @@ invariant.
 | 012 | Website brand brief: HERALD voice, positioning, family contrast | P3 | M | — | TODO |
 | 013 | Agent-hierarchy awareness (curtain shipped; statusline + tmux bar) | P1 | M | 005 | IN PROGRESS |
 | 014 | Curtain themes, per-session binding, animated ASCII art, transparent bg | P2 | M | 005, 013 | DONE |
+| 015 | Event-driven curtain focus (Mac Hammerspoon → Manjaro SSH stream) | P2 | M | 013, 014 | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
 REJECTED (with one-line rationale)
