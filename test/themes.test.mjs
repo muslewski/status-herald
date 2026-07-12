@@ -53,3 +53,15 @@ test("isAnimated is true only when a state has more than one frame", () => {
   assert.equal(isAnimated({ states: { x: { frames: [["a"], ["b"]] } } }), true);
   assert.equal(isAnimated({ states: { x: { frames: [["a"]] } } }), false);
 });
+
+test("minimal is transparent glyph/label", () => {
+  assert.equal(BUILTINS.minimal.background, "transparent");
+  assert.equal(BUILTINS.minimal.states.done.label, "DONE");
+  assert.ok(!BUILTINS.minimal.states.working.frames);
+});
+
+test("forge is a transparent, animated theme", () => {
+  assert.equal(BUILTINS.forge.background, "transparent");
+  assert.ok(BUILTINS.forge.states.working.frames.length >= 2);
+  assert.equal(isAnimated(BUILTINS.forge), true);
+});
