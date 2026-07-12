@@ -29,7 +29,7 @@ test(
     delete process.env.TMUX;
 
     try {
-      // --- gridUp: bring up a 2-slot grid, panes run `sleep 1000` (never real claude) ---
+      // --- gridUp: bring up a 2-slot grid, panes run `sleep 1000` (never real agent) ---
       const rc = gridUp({ slots: 2, cmd: "sleep 1000" });
       assert.equal(rc, 0, "gridUp should return 0");
 

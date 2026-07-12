@@ -35,7 +35,7 @@ test(
     // biome-ignore lint/performance/noDelete: env must be truly unset to look "outside tmux".
     delete process.env.TMUX;
     try {
-      // Two sessions, each a "live" window named like a Claude label.
+      // Two sessions, each a "live" window named like an agent label.
       tt([
         "new-session",
         "-d",

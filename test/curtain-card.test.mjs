@@ -70,11 +70,40 @@ test("subagents never leak onto the DONE card, nor shells onto WORKING", () => {
   assert.doesNotMatch(working, /shell/);
 });
 
+test("compacting card announces the compaction instead of looking done", () => {
+  const text = renderCard("compacting", 0, 40, 10).map(plain).join("\n");
+  assert.match(text, /COMPACTING/);
+  assert.doesNotMatch(text, /DONE/);
+});
+
+test("done card reports how long the turn worked", () => {
+  const text = renderCard("done", 0, 60, 10, { worked: 125 })
+    .map(plain)
+    .join("\n");
+  assert.match(text, /worked 2:05/);
+  assert.match(text, /focus to open/);
+});
+
+test("done card omits the worked line when nothing was timed", () => {
+  const text = renderCard("done", 0, 60, 10, { worked: 0 })
+    .map(plain)
+    .join("\n");
+  assert.doesNotMatch(text, /worked/);
+});
+
+test("done card stacks the worked clock above the shells hint", () => {
+  const text = renderCard("done", 0, 60, 12, { worked: 90, shells: 2 })
+    .map(plain)
+    .join("\n");
+  assert.match(text, /worked 1:30/);
+  assert.match(text, /2 shells in bg/);
+});
+
 test("unknown state falls back to idle without throwing", () => {
   assert.equal(renderCard("bogus", 0, 40, 6).length, 6);
 });
 
-test("CLI render prints a clear-screen frame with WORKING", () => {
+test("CLI render repaints in place (no full-screen clear that would flicker)", () => {
   const out = execFileSync(
     "node",
     [
@@ -95,8 +124,16 @@ test("CLI render prints a clear-screen frame with WORKING", () => {
     ],
     { encoding: "utf8" },
   );
-  // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC (\x1b) is the literal byte the clear-screen sequence starts with; intentional.
-  assert.match(out, /\x1b\[2J/); // clear screen
+  // The flicker fix: home the cursor and overwrite in place rather than erase the
+  // whole screen (2J) each frame -- the 2J blanks every row before the repaint.
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC (\x1b) is the literal byte the erase-screen sequence starts with; intentional.
+  assert.doesNotMatch(out, /\x1b\[2J/); // must NOT clear the screen
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC (\x1b) is the literal byte the cursor-home sequence starts with; intentional.
+  assert.match(out, /\x1b\[H/); // homes the cursor instead
+  // Wrap is turned off around the paint so a double-width glyph cannot spill onto
+  // the next row and scroll the block (which ghosted the label as a second copy).
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC (\x1b) is the literal byte the DECAWM sequence starts with; intentional.
+  assert.match(out, /\x1b\[\?7l/); // wrap disabled
   // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC (\x1b) is the literal byte that opens an SGR/CSI sequence; intentional.
   assert.match(out.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, ""), /WORKING/);
 });

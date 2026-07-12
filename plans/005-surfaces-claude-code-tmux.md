@@ -27,12 +27,10 @@
 ## Why this matters
 
 This plan makes HERALD actually appear somewhere. Two launch surfaces:
-Claude Code's statusLine (a shell command fed JSON on stdin, its stdout
-displayed as the bar) and tmux's status-right (`#(command)` polled on
-`status-interval`). It also ships the non-clobbering installers — the part
-users judge a tool by. agentic-sage already solved safe settings.json
-merging (backup, abort-on-malformed, skip-if-present); this plan ports that
-behavior.
+Agent surfaces (Claude Code statusLine, Grok TUI integration via hooks, tmux
+status-right, etc.). This plan originally targeted Claude but the runtime is
+now generalized; the curtain (current primary tmux surface) supports multiple
+agents via normalized hooks.
 
 ## Current state
 

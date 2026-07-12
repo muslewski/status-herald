@@ -11,11 +11,13 @@ while :; do
   since=$(tmux show -t "$sess" -v @herald_since 2>/dev/null)
   subs=$(tmux show -t "$sess" -v @herald_bg_subagents 2>/dev/null)
   shells=$(tmux show -t "$sess" -v @herald_bg_shells 2>/dev/null)
+  worked=$(tmux show -t "$sess" -v @herald_worked 2>/dev/null)
   cols=$(tput cols 2>/dev/null || echo 80)
   rows=$(tput lines 2>/dev/null || echo 24)
   herald render --surface curtain-card \
     --state "${state:-idle}" --since "${since:-0}" \
     --subagents "${subs:-0}" --shells "${shells:-0}" \
+    --worked "${worked:-0}" \
     --cols "$cols" --rows "$rows" --color always 2>/dev/null || true
   if read -rsn1 -t 1 2>/dev/null; then
     herald curtain reveal "$sess" >/dev/null 2>&1 || true
