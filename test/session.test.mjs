@@ -586,3 +586,10 @@ test("armAll with * arms all", () => {
   assert.equal(t.getSessOpt("s1", "@herald_armed"), "1");
   assert.equal(t.getSessOpt("s2", "@herald_armed"), "1");
 });
+
+test("arm stores the resolved theme name and frame interval", () => {
+  const t = makeT(freshSession());
+  arm("s1", t);
+  assert.equal(t.getSessOpt("s1", "@herald_theme"), "classic");
+  assert.equal(t.getSessOpt("s1", "@herald_frame_ms"), "1000");
+});
