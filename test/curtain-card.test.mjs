@@ -139,6 +139,39 @@ test("CLI render repaints in place (no full-screen clear that would flicker)", (
   assert.match(out.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, ""), /WORKING/);
 });
 
+test("CLI render selects the themed frame by --theme and --tick", () => {
+  const run = (theme, tick) =>
+    execFileSync(
+      "node",
+      [
+        "bin/herald",
+        "render",
+        "--surface",
+        "curtain-card",
+        "--state",
+        "working",
+        "--since",
+        "0",
+        "--cols",
+        "24",
+        "--rows",
+        "8",
+        "--theme",
+        theme,
+        "--tick",
+        String(tick),
+        "--color",
+        "always",
+      ],
+      { encoding: "utf8" },
+    )
+      // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC (\x1b) is the literal byte that opens an SGR sequence; intentional.
+      .replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "");
+  // 'classic' has no frames — WORKING is always present regardless of tick.
+  assert.match(run("classic", 0), /WORKING/);
+  assert.match(run("classic", 7), /WORKING/);
+});
+
 test("classic renderCard output is unchanged when theme/tick default", () => {
   // The existing tests above already assert classic content; this pins that
   // passing an explicit classic theme + tick 0 yields the same lines.
