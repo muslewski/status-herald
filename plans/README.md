@@ -52,9 +52,9 @@ REJECTED (with one-line rationale) | SUPERSEDED | PARTIAL | FROZEN
 
 ## Quality revision (2026-07)
 
-Landed plans **013–019** are under a Grok 4.5 **revise-executed** campaign
+Landed plans **013–019** completed a Grok 4.5 **revise-executed** campaign (closed)
 (`docs/superpowers/specs/2026-07-13-herald-plan-quality-revision-design.md`,
-`plans/revision-README.md`). Plan **020** is frozen until that campaign closes.
+`plans/revision-README.md`). Plan **020** may resume — quality-revision campaign closed with green light.
 Do not treat this table’s DONE as “never audit” — DONE means shipped enough to
 revise, not “perfect.”
 

@@ -20,23 +20,23 @@
 
 | ID | Plans | Primary paths | Key commits (evidence) | Audit status |
 |----|-------|---------------|------------------------|--------------|
-| C1 | 013 curtain + per-tab | `lib/curtain/{session,orchestrator,tmux,state,grid,install,hook,debug}.mjs`, curtain CLI, `scripts/curtain-card-*.sh` | `a0699c8`..`a147449`, `b49f8b8`, `f278209` | AUDITED |
-| C2 | 014 | `lib/curtain/themes.mjs`, hook/state | `479da55` | AUDITED |
-| C3 | 015 | `mac/herald-focus.lua`, `scripts/focus-agent/*`, systemd unit, config keys | `6046ad2`..`5b661c7` | PENDING |
-| C4 | 016 | card loop/session, bar save/restore | `30c702c`..`442bfbf` | PENDING |
-| C5 | 018 | `lib/status/segments.mjs`, `lib/render.mjs` | `ef1b148`..`ec7b75e` | PENDING |
-| C6 | 019 | `lib/status/{compute,grok-adapter,bridge-token-forecast}.mjs` | `1aa506e` | PENDING |
+| C1 | 013 curtain + per-tab | `lib/curtain/{session,orchestrator,tmux,state,grid,install,hook,debug}.mjs`, curtain CLI, `scripts/curtain-card-*.sh` | `a0699c8`..`a147449`, `b49f8b8`, `f278209` | REVISED |
+| C2 | 014 | `lib/curtain/themes.mjs`, hook/state | `479da55` | REVISED |
+| C3 | 015 | `mac/herald-focus.lua`, `scripts/focus-agent/*`, systemd unit, config keys | `6046ad2`..`5b661c7` | REVISED |
+| C4 | 016 | card loop/session, bar save/restore | `30c702c`..`442bfbf` | REVISED |
+| C5 | 018 | `lib/status/segments.mjs`, `lib/render.mjs` | `ef1b148`..`ec7b75e` | REVISED |
+| C6 | 019 | `lib/status/{compute,grok-adapter,bridge-token-forecast}.mjs` | `1aa506e` | REVISED |
 
 ## Phases
 
 | Phase | Status | Notes |
 |-------|--------|-------|
 | 0 Inventory + index + freeze | DONE | freeze wip/020-partial@56b4615; baseline 224 pass |
-| 1 C1+C2 audit/fix | DONE | r001-r004 merged; 233 pass |
-| 2 C3+C4 audit/fix | TODO | |
-| 3 C5+C6 audit/fix | TODO | |
-| 4 Cross-cutting residual | TODO | |
-| Campaign closed | TODO | Green light for 020 only when closed |
+| 1 C1+C2 audit/fix | DONE | r001-r004 |
+| 2 C3+C4 audit/fix | DONE | r005-r007 |
+| 3 C5+C6 audit/fix | DONE | r008-r009 |
+| 4 Cross-cutting residual | DONE | no new P0/P1; P2/P3 deferred |
+| Campaign closed | DONE | Green light for 020: YES (with residual DEFERs) |
 
 
 ## Fix-plans (`plans/rNNN-*.md`)
@@ -84,3 +84,12 @@
 - `lib/status/tmux-status.mjs`, `lib/status/background.mjs`, `test/status-surfaces.test.mjs`, `plans/020-*`
 - Plans 002–012 generic engine (superseded per `plans/017-herald-native-bars.md`)
 - Live tmux sessions / operator `~/.claude` mutation
+
+
+## Campaign close
+
+- Final baseline: re-measure at close commit
+- r001–r009: DONE (merged)
+- Green light for Plan 020: **YES**
+- Residual: deferred P2/P3 weak-tests and product polish (focus title tie-break, doctor §6.6, more theme/compute edges) — see findings log
+- By-design: never-built 002–012 superseded; 020 was frozen during campaign
