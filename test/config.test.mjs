@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { DEFAULTS, loadConfig, stripTitle } from "../lib/config.mjs";
+import { DEFAULTS, loadConfig, merge, stripTitle } from "../lib/config.mjs";
 
 test("loadConfig returns DEFAULTS when the file is absent", () => {
   assert.equal(
@@ -96,4 +96,15 @@ test("loadConfig honors a hammerspoon focus source override", () => {
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("curtain.tmuxBar defaults to keep (no bar change)", () => {
+  assert.equal(DEFAULTS.curtain.tmuxBar.whenCovered, "keep");
+});
+
+test("a user can override tmuxBar.whenCovered to transparent", () => {
+  const cfg = merge(DEFAULTS, {
+    curtain: { tmuxBar: { whenCovered: "transparent" } },
+  });
+  assert.equal(cfg.curtain.tmuxBar.whenCovered, "transparent");
 });

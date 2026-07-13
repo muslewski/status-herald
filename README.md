@@ -191,6 +191,7 @@ The `curtain` block, with its defaults:
 - `autoArm.enabled` / `autoArm.sessionGlob` — whether `herald curtain arm-all`
   is allowed to run, and which tmux sessions it arms (`*` = all,
   `prefix*` = glob-matched, or an exact name).
+- `tmuxBar.whenCovered` — while a session is covered, `transparent` drops the tmux status bar's background and restores it on reveal. Default `"keep"`.
 
 ### Curtain themes
 

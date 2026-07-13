@@ -648,6 +648,81 @@ test("arm stores the resolved theme name and frame interval", () => {
   assert.equal(t.getSessOpt("s1", "@herald_frame_ms"), "1000", "static -> 1s");
 });
 
+const transparent = { tmuxBar: { whenCovered: "transparent" } };
+
+test("cover in transparent mode drops the bar bg and saves the exact prior style", () => {
+  const t = makeT(freshSession());
+  arm("s1", t, {});
+  t.setSessOpt("s1", "@herald_state", "working");
+  t.setSessOpt("s1", "status-style", "bg=colour234,fg=white");
+  cover("s1", t, transparent);
+  assert.equal(
+    t.getSessOpt("s1", "status-style"),
+    "bg=colour234,fg=white,bg=default",
+  );
+  assert.equal(
+    t.getSessOpt("s1", "@herald_prev_status_style"),
+    "bg=colour234,fg=white",
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_bar_saved"), "1");
+});
+
+test("reveal restores the exact prior status-style", () => {
+  const t = makeT(freshSession());
+  arm("s1", t, {});
+  t.setSessOpt("s1", "@herald_state", "working");
+  t.setSessOpt("s1", "status-style", "bg=colour234,fg=white");
+  cover("s1", t, transparent);
+  reveal("s1", t, transparent);
+  assert.equal(t.getSessOpt("s1", "status-style"), "bg=colour234,fg=white");
+  assert.equal(t.getSessOpt("s1", "@herald_bar_saved"), "");
+});
+
+test("with no prior status-style, reveal unsets it (back to inheritance)", () => {
+  const t = makeT(freshSession());
+  arm("s1", t, {});
+  t.setSessOpt("s1", "@herald_state", "working");
+  cover("s1", t, transparent);
+  assert.equal(t.getSessOpt("s1", "status-style"), "bg=default");
+  reveal("s1", t, transparent);
+  assert.equal(t.getSessOpt("s1", "status-style"), "", "unset, not stranded");
+});
+
+test("keep mode never touches status-style", () => {
+  const t = makeT(freshSession());
+  arm("s1", t, {});
+  t.setSessOpt("s1", "@herald_state", "working");
+  cover("s1", t, {}); // default keep
+  assert.equal(t.getSessOpt("s1", "status-style"), "");
+  assert.equal(t.getSessOpt("s1", "@herald_bar_saved"), "");
+});
+
+test("revealAll and disarm restore the bar", () => {
+  const t = makeT(freshSession());
+  arm("s1", t, {});
+  t.setSessOpt("s1", "@herald_state", "done");
+  t.setSessOpt("s1", "status-style", "bg=colour234");
+  cover("s1", t, transparent);
+  revealAll(t, transparent);
+  assert.equal(t.getSessOpt("s1", "status-style"), "bg=colour234");
+
+  cover("s1", t, transparent);
+  disarm("s1", t, transparent);
+  assert.equal(t.getSessOpt("s1", "status-style"), "bg=colour234");
+});
+
+test("focus covers the non-matching session with the bar dropped", () => {
+  const t = makeT(twoArmed());
+  t.setSessOpt("s2", "status-style", "bg=colour234");
+  focus("Syndcast Backlog", t, transparent); // reveals s1, covers s2
+  assert.equal(t.getSessOpt("s2", "status-style"), "bg=colour234,bg=default");
+  assert.equal(
+    t.getSessOpt("s1", "@herald_bar_saved"),
+    "",
+    "revealed s1 has no drop",
+  );
+});
+
 test("arm stamps an animated theme's faster frame interval", () => {
   const t = makeT(freshSession());
   arm("s1", t, { theme: "forge" });
