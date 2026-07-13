@@ -138,16 +138,35 @@ test("renderLine drops lowest-priority items (rightmost on ties) until fits or 1
 });
 
 test("renderLine multi-drop tie-breaks rightmost-lowest first (deterministic)", () => {
+  // Weak old fixture (X/Y/Z width=1) only asserted final sole survivor "X", which is
+  // identical whether B or C drops first — false confidence on rightmost order.
+  // Strong fixture: intermediate survivor string differs by which low-pri is dropped.
+  // Full "AAA  B  C" = 9; "AAA  B" = "AAA  C" = 6. Width 6 fits only after one drop.
+  // Rightmost-lowest first → drop C → "AAA  B". Leftmost-first wrong order → "AAA  C".
   const items = [
-    { id: "left", text: "X", role: "ok", priority: 5 },
-    { id: "mid", text: "Y", role: "ok", priority: 1 },
-    { id: "right", text: "Z", role: "ok", priority: 1 },
+    { id: "a", text: "AAA", role: "ok", priority: 5 },
+    { id: "b", text: "B", role: "ok", priority: 1 },
+    { id: "c", text: "C", role: "ok", priority: 1 },
   ];
-  // width fits only one char + margins, will drop lows; rightmost low (right) drops first
-  // after drop right, still > , drop next low which is now mid, left "X"
-  const out = renderLine(items, { mode: "plain", width: 1, sep: "  " });
-  assert.equal(out, "X");
-  // also assert order of survivors would preserve relative: if we had width that keeps two highest effective
+  const out = renderLine(items, { mode: "plain", width: 6, sep: "  " });
+  assert.equal(out, "AAA  B");
+  assert.notEqual(
+    out,
+    "AAA  C",
+    "must drop rightmost low-pri (c), not leftmost (b)",
+  );
+});
+
+test("ROLES table matches plan 018 semantic palette", () => {
+  assert.deepEqual(ROLES, {
+    ok: { ansi: 32, tmux: "colour46" },
+    notice: { ansi: 36, tmux: "colour51" },
+    warn: { ansi: 33, tmux: "colour226" },
+    crit: { ansi: 31, tmux: "colour196" },
+    over: { ansi: 91, tmux: "colour201" },
+    accent: { ansi: 93, tmux: "colour214" },
+    dim: { ansi: 90, tmux: "colour244" },
+  });
 });
 
 test("renderLine width decisions are on plain text even in tmux mode; result markup width ok", () => {
