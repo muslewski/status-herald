@@ -26,25 +26,37 @@ invariant.
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
-| 001 | Bootstrap repo skeleton (git, CI, biome, release-please) | P1 | S | — | TODO |
-| 002 | Segment model, theme engine, ansi/tmux/plain renderers | P1 | M | 001 | TODO |
-| 003 | Config, project registry (repoId), preset resolution | P1 | M | 001 | TODO |
-| 004 | Provider layer (json-file, file-age, command, static, claude-context) | P1 | M | 001, 003 | TODO |
-| 005 | Surfaces: claude-code + tmux render, safe installers, doctor | P1 | L | 001–004 | TODO |
-| 006 | Six built-in presets + preset loader | P1 | M | 001–005 | TODO |
-| 007 | Interactivity: `herald menu` (tmux display-menu + fallback) | P2 | S | 003, 005, 006 | TODO |
-| 008 | Identity: display name, `herald name`, tmux rename sync | P2 | S | 003, 005, 006 | TODO |
-| 009 | Documentation to the agentic-sage quality bar | P2 | M | 001–008 | TODO |
-| 010 | Research spike: zellij + kitty surfaces (report only) | P3 | S | 002, 005 | TODO |
-| 011 | Open-source launch: GitHub remote, npm publish, install paths | P2 | M | 001 (Part A); 001–009 (Part B) | TODO |
-| 012 | Website brand brief: HERALD voice, positioning, family contrast | P3 | M | — | TODO |
-| 013 | Agent-hierarchy awareness (curtain shipped; statusline + tmux bar) | P1 | M | 005 | IN PROGRESS |
-| 014 | Curtain themes, per-session binding, animated ASCII art, transparent bg | P2 | M | 005, 013 | DONE |
-| 015 | Event-driven curtain focus (Mac Hammerspoon → Manjaro SSH stream) | P2 | M | 013, 014 | TODO |
-| 016 | Curtain anim polish (done/compacting) + visible-only perf gate + rename-safe card + tmux-bar transparent coupling | P2 | M | 013, 014 | SPEC |
+| 001 | Bootstrap repo skeleton (git, CI, biome, release-please) | P1 | S | — | DONE (bootstrap shipped; not re-audited this campaign) |
+| 002 | Segment model, theme engine, ansi/tmux/plain renderers | P1 | M | 001 | SUPERSEDED — never built; harvest path is Plan 017+ (see 017) |
+| 003 | Config, project registry (repoId), preset resolution | P1 | M | 001 | SUPERSEDED — never built; harvest path is Plan 017+ (see 017) |
+| 004 | Provider layer (json-file, file-age, command, static, claude-context) | P1 | M | 001, 003 | SUPERSEDED — never built; harvest path is Plan 017+ (see 017) |
+| 005 | Surfaces: claude-code + tmux render, safe installers, doctor | P1 | L | 001–004 | SUPERSEDED — never built; harvest path is Plan 017+ (see 017) |
+| 006 | Six built-in presets + preset loader | P1 | M | 001–005 | SUPERSEDED — never built; harvest path is Plan 017+ (see 017) |
+| 007 | Interactivity: `herald menu` (tmux display-menu + fallback) | P2 | S | 003, 005, 006 | SUPERSEDED / DEFERRED — never built as written |
+| 008 | Identity: display name, `herald name`, tmux rename sync | P2 | S | 003, 005, 006 | SUPERSEDED / DEFERRED — never built as written |
+| 009 | Documentation to the agentic-sage quality bar | P2 | M | 001–008 | SUPERSEDED / DEFERRED — never built as written |
+| 010 | Research spike: zellij + kitty surfaces (report only) | P3 | S | 002, 005 | SUPERSEDED / DEFERRED — never built as written |
+| 011 | Open-source launch: GitHub remote, npm publish, install paths | P2 | M | 001 (Part A); 001–009 (Part B) | PARTIAL — remote exists; full OSS launch not campaign scope |
+| 012 | Website brand brief: HERALD voice, positioning, family contrast | P3 | M | — | TODO (docs-only; not campaign scope) |
+| 013 | Agent-hierarchy awareness (curtain shipped; statusline + tmux bar) | P1 | M | 005 | PARTIAL — curtain half DONE; statusline/tmux-bar halves → 017+ |
+| 014 | Curtain themes, per-session binding, animated ASCII art, transparent bg | P2 | M | 005, 013 | DONE (landed; quality-revision Phase 1) |
+| 015 | Event-driven curtain focus (Mac Hammerspoon → Manjaro SSH stream) | P2 | M | 013, 014 | DONE (landed; quality-revision Phase 2) |
+| 016 | Curtain anim polish (done/compacting) + visible-only perf gate + rename-safe card + tmux-bar transparent coupling | P2 | M | 013, 014 | DONE (landed; quality-revision Phase 2) — was SPEC in index |
+| 017 | Herald-native status bars (program / Slice 2) | P1 | XL | curtain | SPEC (program umbrella) |
+| 018 | Status engine (segments, roles, width-drop) | P1 | M | 017 | DONE (landed; quality-revision Phase 3) |
+| 019 | Status compute + bridges | P1 | M | 018 | DONE (landed; quality-revision Phase 3) |
+| 020 | Status surfaces wiring | P1 | L | 019 | PARTIAL / FROZEN — out of quality-revision until campaign close |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
-REJECTED (with one-line rationale)
+REJECTED (with one-line rationale) | SUPERSEDED | PARTIAL | FROZEN
+
+## Quality revision (2026-07)
+
+Landed plans **013–019** are under a Grok 4.5 **revise-executed** campaign
+(`docs/superpowers/specs/2026-07-13-herald-plan-quality-revision-design.md`,
+`plans/revision-README.md`). Plan **020** is frozen until that campaign closes.
+Do not treat this table’s DONE as “never audit” — DONE means shipped enough to
+revise, not “perfect.”
 
 ## Dependency notes
 
