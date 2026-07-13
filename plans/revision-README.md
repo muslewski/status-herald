@@ -32,7 +32,7 @@
 | Phase | Status | Notes |
 |-------|--------|-------|
 | 0 Inventory + index + freeze | DONE | freeze wip/020-partial@56b4615; baseline 224 pass |
-| 1 C1+C2 audit/fix | IN PROGRESS | findings vetted; r001-r004 |
+| 1 C1+C2 audit/fix | DONE | r001-r004 merged; 233 pass |
 | 2 C3+C4 audit/fix | TODO | |
 | 3 C5+C6 audit/fix | TODO | |
 | 4 Cross-cutting residual | TODO | |
@@ -43,24 +43,24 @@
 
 | Plan | Parent | Cluster | Severity | Status |
 |------|--------|---------|----------|--------|
-| r001 | 013 / per-tab | C1 | P1 | IN PROGRESS |
-| r002 | 013 / config | C1 | P1 | IN PROGRESS |
-| r003 | install/grid | C1 | P2 | IN PROGRESS |
-| r004 | 013/014 tests | C1+C2 | P1 | IN PROGRESS |
+| r001 | 013 / per-tab | C1 | P1 | DONE |
+| r002 | 013 / config | C1 | P1 | DONE |
+| r003 | install/grid | C1 | P2 | DONE |
+| r004 | 013/014 tests | C1+C2 | P1 | DONE |
 
 
 ## Findings disposition log
 
 | ID | Cluster | Severity | Summary | Disposition |
 |----|---------|----------|---------|-------------|
-| C1a-F1 | C1 | P1 | status reads pane opts; stamps are session-scoped | OPEN → r001 |
-| C1a-F2 | C1 | P1 | coverableStates config ignored | OPEN → r002 |
-| C1a-F3 | C1 | P2 | grid orchestrator omits compacting | OPEN → r002 |
-| C1a-F4 | C1 | P2 | missing Grok Stop synthesis test | OPEN → r004 |
-| C1a-F5 | C1 | P2 | missing compacting cover test | OPEN → r002 |
-| C1b-F1 | C1 | P2 | install drops whole hook group | OPEN → r003 |
-| C1b-F5 | C1 | P2 | grid hooks bare herald | OPEN → r003 |
-| C2-F1 | C2 | P1 | framed card tests omit dynamic info lines | OPEN → r004 |
+| C1a-F1 | C1 | P1 | status reads pane opts; stamps are session-scoped | DONE |
+| C1a-F2 | C1 | P1 | coverableStates config ignored | DONE |
+| C1a-F3 | C1 | P2 | grid orchestrator omits compacting | DONE |
+| C1a-F4 | C1 | P2 | missing Grok Stop synthesis test | DONE |
+| C1a-F5 | C1 | P2 | missing compacting cover test | DONE |
+| C1b-F1 | C1 | P2 | install drops whole hook group | DONE |
+| C1b-F5 | C1 | P2 | grid hooks bare herald | DONE |
+| C2-F1 | C2 | P1 | framed card tests omit dynamic info lines | DONE |
 | C1a-F6 | C1 | P2 | focus title ambiguity tie-break | DEFERRED |
 | C1a-F7 | C1 | P3 | legacy event path pane stamp | DEFERRED |
 | C1a-F8 | C1 | P3 | disarm leaves stale @herald_* | DEFERRED |
@@ -74,10 +74,10 @@
 
 | Plan | Parent | Cluster | Severity | Status |
 |------|--------|---------|----------|--------|
-| r001 | 013 / per-tab | C1 | P1 | IN PROGRESS |
-| r002 | 013 / config | C1 | P1 | IN PROGRESS |
-| r003 | install/grid | C1 | P2 | IN PROGRESS |
-| r004 | 013/014 tests | C1+C2 | P1 | IN PROGRESS |
+| r001 | 013 / per-tab | C1 | P1 | DONE |
+| r002 | 013 / config | C1 | P1 | DONE |
+| r003 | install/grid | C1 | P2 | DONE |
+| r004 | 013/014 tests | C1+C2 | P1 | DONE |
 
 ## Explicit out of scope (do not audit as gaps)
 
