@@ -12,7 +12,7 @@ test("loadConfig returns DEFAULTS when the file is absent", () => {
   );
   assert.deepEqual(
     loadConfig(join(tmpdir(), "nope-herald-xyz.json")).curtain.coverableStates,
-    ["working", "done", "needs"],
+    ["working", "done", "needs", "compacting"],
   );
 });
 
@@ -32,7 +32,12 @@ test("loadConfig deep-merges overrides onto defaults", () => {
       "ghostty",
       "unspecified keys keep defaults",
     );
-    assert.deepEqual(c.curtain.coverableStates, ["working", "done", "needs"]);
+    assert.deepEqual(c.curtain.coverableStates, [
+      "working",
+      "done",
+      "needs",
+      "compacting",
+    ]);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
