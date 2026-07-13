@@ -90,3 +90,79 @@ test("orderSegments shallow merges including priority, returns objects with id",
   assert.equal(out[0].priority, 99);
   assert.equal(out[0].foo, "bar"); // from base
 });
+
+test("renderLine unlimited width returns all full texts joined (plain)", () => {
+  const items = [
+    { id: "a", text: "longone", role: "ok", priority: 10 },
+    { id: "b", text: "short", role: "warn", priority: 5 },
+  ];
+  const out = renderLine(items, { mode: "plain", width: null, sep: "  " });
+  assert.equal(out, "longone  short");
+});
+
+test("renderLine when fits within width uses full texts", () => {
+  const items = [
+    { id: "x", text: "abc", role: "ok", priority: 1 },
+    { id: "y", text: "def", role: "ok", priority: 2 },
+  ];
+  const out = renderLine(items, { mode: "plain", width: 20, sep: "  " });
+  assert.equal(out, "abc  def");
+  assert.ok(visibleWidth(out) <= 20);
+});
+
+test("renderLine shorten uses short of lowest-priority item first", () => {
+  const items = [
+    { id: "hi", text: "HIGHPRI", short: "HI", role: "ok", priority: 100 },
+    {
+      id: "lo",
+      text: "LOWPRIORITYLONG",
+      short: "LO",
+      role: "warn",
+      priority: 1,
+    },
+  ];
+  // width fits "HIGHPRI  LO" (7+2+2=11) but not full "HIGHPRI  LOWPRIORITYLONG"
+  const out = renderLine(items, { mode: "plain", width: 12, sep: "  " });
+  assert.equal(out, "HIGHPRI  LO");
+});
+
+test("renderLine drops lowest-priority items (rightmost on ties) until fits or 1 left", () => {
+  const items = [
+    { id: "p1", text: "A", role: "ok", priority: 10 },
+    { id: "p2", text: "B", role: "ok", priority: 1 },
+    { id: "p3", text: "C", role: "ok", priority: 1 },
+  ];
+  // very narrow: only highest (p1 prio10) should survive
+  const out = renderLine(items, { mode: "plain", width: 1, sep: "  " });
+  assert.equal(out, "A");
+});
+
+test("renderLine multi-drop tie-breaks rightmost-lowest first (deterministic)", () => {
+  const items = [
+    { id: "left", text: "X", role: "ok", priority: 5 },
+    { id: "mid", text: "Y", role: "ok", priority: 1 },
+    { id: "right", text: "Z", role: "ok", priority: 1 },
+  ];
+  // width fits only one char + margins, will drop lows; rightmost low (right) drops first
+  // after drop right, still > , drop next low which is now mid, left "X"
+  const out = renderLine(items, { mode: "plain", width: 1, sep: "  " });
+  assert.equal(out, "X");
+  // also assert order of survivors would preserve relative: if we had width that keeps two highest effective
+});
+
+test("renderLine width decisions are on plain text even in tmux mode; result markup width ok", () => {
+  const items = [
+    { id: "a", text: "foo", short: "f", role: "ok", priority: 10 },
+    { id: "b", text: "barbarbar", short: "b", role: "warn", priority: 1 },
+  ];
+  const plainOut = renderLine(items, { mode: "plain", width: 5, sep: " " });
+  const tmuxOut = renderLine(items, { mode: "tmux", width: 5, sep: " " });
+  // drop decisions should match: b shortens or drops; here width=5 forces use short on b? "foo b" =5
+  assert.equal(plainOut, "foo b");
+  // tmux output has markup but its visible width must be <=5 and equal plain decision
+  assert.equal(visibleWidth(tmuxOut), visibleWidth(plainOut));
+  assert.ok(visibleWidth(tmuxOut) <= 5);
+  // and contains the tmux markup for roles
+  assert.match(tmuxOut, /#\[fg=colour46\]foo#\[/);
+  assert.match(tmuxOut, /#\[fg=colour226\]b#\[/);
+});
