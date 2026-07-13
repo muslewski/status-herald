@@ -25,3 +25,44 @@ test("card loop reveals (restoring the bar) on exit/signal", () => {
   assert.match(script, /trap .* EXIT/, "has an exit/signal trap");
   assert.match(script, /curtain reveal/, "trap path reveals");
 });
+
+// settleAfter freezes once tick > settleAfter (pickFrame). A monotonic tick from
+// arm means DONE after a long WORKING session already has tick ≫ settleAfter and
+// never animates. Reset tick when @herald_state changes so the first frame of a
+// new state uses tick 0.
+test("card loop resets tick when herald state changes (settleAfter relative to entry)", () => {
+  assert.match(
+    script,
+    /prev_state/,
+    "tracks previous state across loop iterations",
+  );
+  assert.match(
+    script,
+    /"\$state"\s*!=\s*"\$\{prev_state\}"/,
+    "compares current state to previous",
+  );
+  // On change: tick=0 before render (first frame of new state), not only after.
+  const changeBlock = script.match(
+    /if\s+\[\s*"\$state"\s*!=\s*"\$\{prev_state\}"\s*\][\s\S]*?fi/,
+  );
+  assert.ok(changeBlock, "state-change if-block present");
+  assert.match(changeBlock[0], /tick=0/, "resets tick to 0 on state change");
+  assert.match(
+    changeBlock[0],
+    /prev_state=\$state/,
+    "stores new state as prev",
+  );
+
+  // Reset must occur before the render invocation so first paint uses tick 0.
+  const stateAssign = script.indexOf("state=${O[@herald_state]");
+  const renderCall = script.indexOf("herald render --surface curtain-card");
+  const tickReset = script.indexOf("tick=0", script.indexOf("prev_state"));
+  assert.ok(
+    stateAssign >= 0 && renderCall > stateAssign,
+    "state read before render",
+  );
+  assert.ok(
+    tickReset > stateAssign && tickReset < renderCall,
+    "tick reset after state read and before render",
+  );
+});

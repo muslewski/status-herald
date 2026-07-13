@@ -29,6 +29,14 @@ while :; do
   theme=${O[@herald_theme]:-classic}
   frame_ms=${O[@herald_frame_ms]:-1000}
   covered=${O[@herald_covered]:-0}
+  # settleAfter is relative to state entry: a monotonic tick from arm freezes
+  # DONE/COMPACTING animation after a long WORKING session. Reset on change so
+  # the first paint of the new state uses tick 0.
+  prev_state=${prev_state-}
+  if [ "$state" != "${prev_state}" ]; then
+    tick=0
+    prev_state=$state
+  fi
   cols=$(tput cols 2>/dev/null || echo 80)
   rows=$(tput lines 2>/dev/null || echo 24)
   herald render --surface curtain-card \
