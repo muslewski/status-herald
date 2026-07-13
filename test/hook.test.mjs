@@ -355,6 +355,28 @@ test("a completing turn drains COMPACTING back to DONE", () => {
   );
 });
 
+// Golden compact sequence — mirrors agentic-sage plan 026 / interop contract.
+// Same normalized hook order: prompt → tools → PreCompact → drain → tools again.
+// Herald must never show compacting as DONE; PostToolUse is "active again".
+test("interop golden compact sequence: never DONE while compacting", () => {
+  let s = STATES.IDLE;
+  s = nextState(s, ev({ event: "UserPromptSubmit" }));
+  assert.equal(s, STATES.WORKING);
+  s = nextState(s, ev({ event: "PostToolUse" }));
+  assert.equal(s, STATES.WORKING);
+  s = nextState(s, ev({ event: "PreCompact" }));
+  assert.equal(s, STATES.COMPACTING);
+  assert.notEqual(s, STATES.DONE);
+  // Drain via idle_prompt (primary end-marker after compact) or Stop.
+  s = nextState(s, ev({ event: "Notification", notificationType: "idle_prompt" }));
+  assert.equal(s, STATES.DONE);
+  // Or: compact → PostToolUse resumes working (block cleared / turn continues).
+  assert.equal(
+    nextState(STATES.COMPACTING, ev({ event: "PostToolUse" })),
+    STATES.WORKING,
+  );
+});
+
 test("end to end: a subagent turn never reports DONE while the agent works", () => {
   // Replayed from a real recorded session (prompt f6214c38, 2026-07-09).
   const seen = [];
