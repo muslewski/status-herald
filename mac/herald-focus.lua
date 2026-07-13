@@ -35,7 +35,10 @@ local function truncateIfLarge()
   end
 end
 
+-- Truncate before every write (focus emit + heartbeat). Heartbeat-only sessions
+-- would otherwise grow the event file without bound until a focus change.
 local function append(line)
+  truncateIfLarge()
   local f = io.open(EVENT_FILE, "a")
   if not f then return end
   f:write(line .. "\n")
@@ -47,7 +50,6 @@ local function emit(title)
   title = title or ""
   if title == last then return end
   last = title
-  truncateIfLarge()
   append(title)
 end
 
