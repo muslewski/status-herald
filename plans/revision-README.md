@@ -20,8 +20,8 @@
 
 | ID | Plans | Primary paths | Key commits (evidence) | Audit status |
 |----|-------|---------------|------------------------|--------------|
-| C1 | 013 curtain + per-tab | `lib/curtain/{session,orchestrator,tmux,state,grid,install,hook,debug}.mjs`, curtain CLI, `scripts/curtain-card-*.sh` | `a0699c8`..`a147449`, `b49f8b8`, `f278209` | PENDING |
-| C2 | 014 | `lib/curtain/themes.mjs`, hook/state | `479da55` | PENDING |
+| C1 | 013 curtain + per-tab | `lib/curtain/{session,orchestrator,tmux,state,grid,install,hook,debug}.mjs`, curtain CLI, `scripts/curtain-card-*.sh` | `a0699c8`..`a147449`, `b49f8b8`, `f278209` | AUDITED |
+| C2 | 014 | `lib/curtain/themes.mjs`, hook/state | `479da55` | AUDITED |
 | C3 | 015 | `mac/herald-focus.lua`, `scripts/focus-agent/*`, systemd unit, config keys | `6046ad2`..`5b661c7` | PENDING |
 | C4 | 016 | card loop/session, bar save/restore | `30c702c`..`442bfbf` | PENDING |
 | C5 | 018 | `lib/status/segments.mjs`, `lib/render.mjs` | `ef1b148`..`ec7b75e` | PENDING |
@@ -32,25 +32,52 @@
 | Phase | Status | Notes |
 |-------|--------|-------|
 | 0 Inventory + index + freeze | DONE | freeze wip/020-partial@56b4615; baseline 224 pass |
-| 1 C1+C2 audit/fix | TODO | |
+| 1 C1+C2 audit/fix | IN PROGRESS | findings vetted; r001-r004 |
 | 2 C3+C4 audit/fix | TODO | |
 | 3 C5+C6 audit/fix | TODO | |
 | 4 Cross-cutting residual | TODO | |
 | Campaign closed | TODO | Green light for 020 only when closed |
 
+
 ## Fix-plans (`plans/rNNN-*.md`)
 
 | Plan | Parent | Cluster | Severity | Status |
 |------|--------|---------|----------|--------|
-| _(none yet)_ | | | | |
+| r001 | 013 / per-tab | C1 | P1 | TODO |
+| r002 | 013 / config | C1 | P1 | TODO |
+| r003 | install/grid | C1 | P2 | TODO |
+| r004 | 013/014 tests | C1+C2 | P1 | TODO |
 
-Status values: TODO | IN PROGRESS | DONE | BLOCKED | REJECTED | DEFERRED
 
 ## Findings disposition log
 
 | ID | Cluster | Severity | Summary | Disposition |
 |----|---------|----------|---------|-------------|
-| _(none yet)_ | | | | |
+| C1a-F1 | C1 | P1 | status reads pane opts; stamps are session-scoped | OPEN → r001 |
+| C1a-F2 | C1 | P1 | coverableStates config ignored | OPEN → r002 |
+| C1a-F3 | C1 | P2 | grid orchestrator omits compacting | OPEN → r002 |
+| C1a-F4 | C1 | P2 | missing Grok Stop synthesis test | OPEN → r004 |
+| C1a-F5 | C1 | P2 | missing compacting cover test | OPEN → r002 |
+| C1b-F1 | C1 | P2 | install drops whole hook group | OPEN → r003 |
+| C1b-F5 | C1 | P2 | grid hooks bare herald | OPEN → r003 |
+| C2-F1 | C2 | P1 | framed card tests omit dynamic info lines | OPEN → r004 |
+| C1a-F6 | C1 | P2 | focus title ambiguity tie-break | DEFERRED |
+| C1a-F7 | C1 | P3 | legacy event path pane stamp | DEFERRED |
+| C1a-F8 | C1 | P3 | disarm leaves stale @herald_* | DEFERRED |
+| C1b-F2 | C1 | P2 | disarm order weak-test | DEFERRED |
+| C1b-F3 | C1 | P2 | keypress reveal weak-test | DEFERRED |
+| C1b-F4 | C1 | P2 | doctor short of design §6.6 | DEFERRED |
+| C1b-F6 | C1 | P3 | no bash -n card script test | DEFERRED |
+| C2-F2..F8 | C2 | P2/P3 | additional theme weak-tests | DEFERRED |
+
+## Fix-plans (`plans/rNNN-*.md`)
+
+| Plan | Parent | Cluster | Severity | Status |
+|------|--------|---------|----------|--------|
+| r001 | 013 / per-tab | C1 | P1 | TODO |
+| r002 | 013 / config | C1 | P1 | TODO |
+| r003 | install/grid | C1 | P2 | TODO |
+| r004 | 013/014 tests | C1+C2 | P1 | TODO |
 
 ## Explicit out of scope (do not audit as gaps)
 
