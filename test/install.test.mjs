@@ -171,6 +171,41 @@ test("uninstall removes exactly the herald hooks", () => {
   assert.equal(hooksInstalled(s), false);
 });
 
+// Entry-level drop: a foreign command co-located in the same group as herald
+// must survive uninstall. Pre-r003 dropWhere filtered whole groups, which
+// silently deleted co-located foreign hooks on uninstall/migrate.
+test("removeHooks keeps foreign command in a mixed group", () => {
+  const p = tmp();
+  const cmd = hookCommand();
+  writeFileSync(
+    p,
+    JSON.stringify({
+      hooks: {
+        Stop: [
+          {
+            hooks: [
+              { type: "command", command: cmd },
+              { type: "command", command: "foreign-sidecar" },
+            ],
+          },
+        ],
+      },
+    }),
+  );
+  const r = uninstall(p);
+  assert.equal(r.ok, true);
+  const settings = JSON.parse(readFileSync(p, "utf8"));
+  const cmds = (settings.hooks.Stop || []).flatMap((g) =>
+    (g.hooks || []).map((h) => h.command),
+  );
+  assert.ok(cmds.includes("foreign-sidecar"), "foreign kept");
+  assert.equal(
+    cmds.some((c) => c === cmd),
+    false,
+    "herald removed",
+  );
+});
+
 test("install does not overwrite the pristine .bak on an idempotent re-run", () => {
   const p = tmp();
   writeFileSync(p, JSON.stringify({ model: "opus" }, null, 2));
