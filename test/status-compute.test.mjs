@@ -1,0 +1,188 @@
+import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { test } from "node:test";
+
+// The modules under test (will be created in steps)
+import {
+  buildPerSessionData,
+  computeContext,
+  countMessages,
+  discoverLiveClaudeSessions,
+  fmtTokens,
+  getAccountGauges,
+  latestUsed,
+  modelWindow,
+  readLines,
+  readSessionMeta,
+  shortModelBadge,
+} from "../lib/status/compute.mjs";
+
+import { detectGrok, readProcStatusPpid } from "../lib/status/grok-adapter.mjs";
+
+import {
+  feedSnapshot,
+  readAccountUsage,
+} from "../lib/status/bridge-token-forecast.mjs";
+
+// --- helpers for tests only ---
+async function loadFixture(name) {
+  const p = path.join("test/fixtures", name);
+  if (name.endsWith(".jsonl")) {
+    const buf = await fs.readFile(p);
+    return buf.toString("utf8").split(/\r?\n/).filter(Boolean);
+  }
+  const txt = await fs.readFile(p, "utf8");
+  return JSON.parse(txt);
+}
+
+async function withTempDir(fn) {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "herald-test-"));
+  try {
+    return await fn(dir);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+}
+
+// ===== Task 1 pure math =====
+
+test("latestUsed walks reversed and sums input+cache tokens", async () => {
+  const lines = await loadFixture("transcript-claude-sample.jsonl");
+  assert.equal(latestUsed(lines), 400);
+});
+
+test("countMessages counts human messages, resets on compact_boundary", async () => {
+  const lines = await loadFixture("transcript-claude-sample.jsonl");
+  assert.equal(countMessages(lines), 1);
+});
+
+test("modelWindow 1M for opus-4 / sonnet-4 / 1m markers else 200k", () => {
+  assert.equal(modelWindow("claude-opus-4-8"), 1_000_000);
+  assert.equal(modelWindow("claude-sonnet-4-5"), 1_000_000);
+  assert.equal(modelWindow("something-1m"), 1_000_000);
+  assert.equal(modelWindow("claude-3-haiku"), 200_000);
+  assert.equal(modelWindow(null), 200_000);
+});
+
+test("computeContext returns used/win/pct/messages from transcript", async () => {
+  const lines = await loadFixture("transcript-claude-sample.jsonl");
+  const c = computeContext(lines);
+  assert.equal(c.used, 400);
+  assert.equal(c.win, 1_000_000);
+  assert.equal(c.pct, 0); // small in fixture; other tests use synthetic
+  assert.equal(c.messages, 1);
+});
+
+test("fmtTokens matches python", () => {
+  assert.equal(fmtTokens(2700000), "2.7M");
+  assert.equal(fmtTokens(351234), "351k");
+  assert.equal(fmtTokens(999), "0k");
+});
+
+test("latestUsed / count on synthetic lines with realistic numbers", () => {
+  const lines = [
+    JSON.stringify({ type: "user", message: { content: "a" }, isMeta: false }),
+    JSON.stringify({
+      type: "assistant",
+      message: {
+        model: "claude-opus-4-8",
+        usage: {
+          input_tokens: 300000,
+          cache_read_input_tokens: 50000,
+          cache_creation_input_tokens: 1000,
+        },
+      },
+    }),
+    JSON.stringify({ type: "user", message: { content: "b" }, isMeta: false }),
+  ];
+  assert.equal(latestUsed(lines), 351000);
+  assert.equal(countMessages(lines), 2);
+  const ctx = computeContext(lines);
+  assert.equal(ctx.pct, 35);
+  assert.equal(ctx.messages, 2);
+});
+
+// ===== Task 2 grok adapter basics (more in later tasks) =====
+
+test("readProcStatusPpid returns a number for self (linux)", () => {
+  const pp = readProcStatusPpid(process.pid);
+  assert.ok(typeof pp === "number" && pp > 0);
+});
+
+test("detectGrok on non-grok pid (init) returns not grok (safe)", () => {
+  const g = detectGrok(1);
+  assert.equal(g.isGrok, false);
+});
+
+test("isGrokProcess on current test pid may be polluted by test cmdline but detect is defensive", () => {
+  // The test runner command line can contain "grok" text from aliases; do not assert on process.pid.
+  // Just ensure it does not throw and returns a boolean shape.
+  const g = detectGrok(process.pid);
+  assert.ok(typeof g.isGrok === "boolean");
+});
+
+// ===== Task 3 sidecar + badge =====
+
+test("readSessionMeta returns {} for missing", async () => {
+  const m = await readSessionMeta("no-such-sid");
+  assert.deepEqual(m, {});
+});
+
+test("shortModelBadge reproduces python families + effort glyph", () => {
+  assert.equal(
+    shortModelBadge("Opus 4.8 (1M context)", "xhigh"),
+    "Opus 🧠xhigh",
+  );
+  assert.equal(shortModelBadge("claude-sonnet-4-5", ""), "Sonnet");
+  assert.equal(shortModelBadge("Fable 5", "high"), "Fable 🧠high");
+  assert.equal(shortModelBadge("", ""), "");
+  assert.equal(shortModelBadge("Grok build", "xhigh"), "Grok 🧠xhigh");
+});
+
+// ===== Task 4 bridge (read + feed) =====
+
+test("readAccountUsage from fixture snapshot", async () => {
+  const u = await readAccountUsage({
+    snapshotPath: "test/fixtures/token-forecast-snapshot.json",
+  });
+  assert.ok(u.fiveHour);
+  assert.equal(u.fiveHour.usedPercentage, 12.3);
+  assert.ok(u.weekly);
+  assert.equal(u.weekly.usedPercentage, 45.0);
+  // caps come from defaults or limits when present
+  assert.ok(u.caps && u.caps.fiveHourCap > 0);
+});
+
+test("feedSnapshot is best-effort and does not throw", async () => {
+  await assert.doesNotReject(async () => {
+    await feedSnapshot(
+      { rate_limits: { five_hour: { used_percentage: 10, resets_at: 123 } } },
+      { command: "" },
+    );
+  });
+});
+
+// ===== Task 5 discovery + facade (red skeleton) =====
+
+test("discoverLiveClaudeSessions with fixture dir returns matching live sessions", async () => {
+  await withTempDir(async (tmp) => {
+    const sessDir = path.join(tmp, "sessions");
+    await fs.mkdir(sessDir);
+    await fs.copyFile(
+      "test/fixtures/session-sample.json",
+      path.join(sessDir, "test-sid-1234.json"),
+    );
+    // pid 999999 is not alive; expect filtered
+    const found = await discoverLiveClaudeSessions({ sessionsDir: sessDir });
+    assert.equal(found.length, 0);
+  });
+});
+
+test("buildPerSessionData + grok path returns degraded but valid shape", async () => {
+  const data = await buildPerSessionData("missing-sid", process.pid);
+  assert.ok(data);
+  assert.ok("context" in data);
+  assert.ok(typeof data.modelBadge === "string");
+});
