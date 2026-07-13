@@ -234,6 +234,25 @@ test("forge working art keeps the head centered over the anvil", () => {
   );
 });
 
+// Plan 014 contract: theme owns art; herald still owns dynamic info under frames.
+// Forge geometry tests alone would pass if info concat were dropped.
+test("forge framed working card still shows elapsed and subagent info under art", () => {
+  const lines = renderCard(
+    "working",
+    65, // elapsed seconds → 1:05
+    40,
+    20,
+    { subagents: 2, shells: 0, worked: 0 },
+    BUILTINS.forge,
+    0,
+  ).map(plain);
+  const joined = lines.join("\n");
+  // infoLines working format: `${formatElapsed(elapsed)} · ${plural(n, "subagent")}`
+  assert.match(joined, /1:05 · 2 subagents/);
+  // Art still present so this is framed path, not classic glyph/label only.
+  assert.match(joined, /=======/, "forge anvil art still rendered");
+});
+
 test("transparent theme paints no background fill", () => {
   const theme = {
     background: "transparent",
