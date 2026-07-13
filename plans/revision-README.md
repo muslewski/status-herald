@@ -31,7 +31,7 @@
 
 | Phase | Status | Notes |
 |-------|--------|-------|
-| 0 Inventory + index + freeze | IN PROGRESS | |
+| 0 Inventory + index + freeze | DONE | freeze wip/020-partial@56b4615; baseline 224 pass |
 | 1 C1+C2 audit/fix | TODO | |
 | 2 C3+C4 audit/fix | TODO | |
 | 3 C5+C6 audit/fix | TODO | |
