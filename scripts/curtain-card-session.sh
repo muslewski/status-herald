@@ -10,7 +10,9 @@ set -u
 printf '\033[?25l'
 # On any exit/signal, reveal — which (when tmuxBar coupling is on) restores the
 # status bar, so a killed loop can't strand the dropped background.
-trap 'herald curtain reveal "$(tmux display -p "#{session_name}" 2>/dev/null)" >/dev/null 2>&1 || true' EXIT INT TERM HUP
+# Skip when refreshCards is mid kill/recreate (@herald_refreshing=1); otherwise
+# the trap would uncover under the freshly selected card (keypress no-op).
+trap 's=$(tmux display -p "#{session_name}" 2>/dev/null); r=$(tmux show -t "$s" -v @herald_refreshing 2>/dev/null || true); [ "$r" = "1" ] || herald curtain reveal "$s" >/dev/null 2>&1 || true' EXIT INT TERM HUP
 tick=0
 while :; do
   # One untargeted call dumps every option this repaint needs from the current

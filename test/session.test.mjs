@@ -655,6 +655,57 @@ test("refreshCards respawns each card window without disturbing state", () => {
   );
   assert.equal(t.getSessOpt("s2", "@herald_state"), "working");
   assert.equal(t._S.s2.windows["@curtain"], "_curtain", "card recreated");
+  assert.equal(
+    t.getSessOpt("s1", "@herald_refreshing"),
+    "",
+    "refresh flag cleared after",
+  );
+});
+
+// r007: kill of _curtain fires the card EXIT trap → reveal. Without a
+// refreshing gate + re-assert, a covered session ends with covered=0, bar
+// restored, while the new card is selected (keypress no-op).
+test("refreshCards survives card EXIT trap without uncover", () => {
+  const transparentCfg = { tmuxBar: { whenCovered: "transparent" } };
+  const t = makeT({
+    s1: {
+      opts: {
+        "@herald_armed": "1",
+        "@herald_live_win": "@w1",
+        "@herald_state": "done",
+        "@herald_worked": "42",
+        "@herald_covered": "1",
+        "status-style": "bg=colour234,fg=white,bg=default",
+        "@herald_prev_status_style": "bg=colour234,fg=white",
+        "@herald_bar_saved": "1",
+      },
+      active: "@curtain",
+      windows: { "@w1": "Backlog", "@curtain": "_curtain" },
+    },
+  });
+  // Simulate the shell EXIT trap on killWindow: reveal unless refreshing.
+  t.killWindow = (target) => {
+    const [s] = target.split(":");
+    if (t.getSessOpt(s, "@herald_refreshing") !== "1") {
+      reveal(s, t, transparentCfg);
+    }
+  };
+  refreshCards(t, transparentCfg);
+  assert.equal(
+    t.getSessOpt("s1", "@herald_covered"),
+    "1",
+    "still covered after kill+recreate",
+  );
+  assert.equal(t._S.s1.active, "@curtain", "card window selected");
+  assert.equal(
+    t.getSessOpt("s1", "status-style"),
+    "bg=colour234,fg=white,bg=default",
+    "transparent bar re-applied / preserved",
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_bar_saved"), "1");
+  assert.equal(t.getSessOpt("s1", "@herald_worked"), "42", "state preserved");
+  assert.equal(t.getSessOpt("s1", "@herald_refreshing"), "", "flag cleared");
+  assert.equal(t._S.s1.windows["@curtain"], "_curtain", "card recreated");
 });
 
 test("stampFromHook is a no-op outside tmux", () => {
