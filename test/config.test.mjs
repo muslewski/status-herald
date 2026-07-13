@@ -113,3 +113,44 @@ test("a user can override tmuxBar.whenCovered to transparent", () => {
   });
   assert.equal(cfg.curtain.tmuxBar.whenCovered, "transparent");
 });
+
+test("bars defaults reproduce today's look (account on, model off, claude on)", () => {
+  const cfg = loadConfig(join(tmpdir(), "nope-herald-bars-xyz.json"));
+  assert.ok(cfg.bars, "bars section should exist");
+  assert.equal(cfg.bars.tmux.enabled, true);
+  assert.equal(cfg.bars.claude.enabled, true);
+  assert.equal(cfg.bars.claude.silentCapture, false);
+  assert.equal(cfg.bars.segments.context.enabled, true);
+  assert.equal(cfg.bars.segments.context.priority, 100);
+  assert.equal(cfg.bars.segments.model.enabled, false);
+  assert.equal(cfg.bars.segments.model.priority, 60);
+  assert.equal(cfg.bars.segments.state.enabled, true);
+  assert.equal(cfg.bars.segments.account5h.enabled, true);
+  assert.equal(cfg.bars.segments.accountWeekly.enabled, true);
+  assert.equal(cfg.bars.segments.clock.enabled, true);
+  assert.equal(cfg.bars.segments.notify.enabled, true);
+});
+
+test("bars partial override merges per-segment without clobbering siblings", () => {
+  const cfg = merge(DEFAULTS, {
+    bars: {
+      segments: {
+        account5h: { enabled: false },
+        model: { enabled: true },
+      },
+    },
+  });
+  assert.equal(cfg.bars.segments.account5h.enabled, false);
+  assert.equal(cfg.bars.segments.model.enabled, true);
+  assert.equal(cfg.bars.segments.context.enabled, true);
+  assert.equal(cfg.bars.segments.accountWeekly.enabled, true);
+  assert.equal(cfg.bars.tmux.enabled, true);
+});
+
+test("bars unknown segment keys in config are preserved by merge (ignored by consumers)", () => {
+  const cfg = merge(DEFAULTS, {
+    bars: { segments: { totallyUnknown: { enabled: true, priority: 1 } } },
+  });
+  assert.equal(cfg.bars.segments.totallyUnknown.enabled, true);
+  assert.equal(cfg.bars.segments.context.enabled, true);
+});

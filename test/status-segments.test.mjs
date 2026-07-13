@@ -185,3 +185,123 @@ test("renderLine width decisions are on plain text even in tmux mode; result mar
   assert.match(tmuxOut, /#\[fg=colour46\]foo#\[/);
   assert.match(tmuxOut, /#\[fg=colour226\]b#\[/);
 });
+
+// --- Plan 020 segment builders + registry ---
+
+import {
+  REGISTRY,
+  buildAccountSliderItem,
+  buildContextItem,
+  buildModelItem,
+  buildStateItem,
+} from "../lib/status/segments.mjs";
+
+test("buildContextItem parity plain core (emoji band, bar8, pct, used/win, msgs)", () => {
+  const item = buildContextItem({
+    used: 351000,
+    win: 1000000,
+    pct: 35,
+    messages: 5,
+  });
+  assert.equal(item.id, "context");
+  assert.equal(item.role, gaugeRole(35));
+  assert.equal(item.priority, 100);
+  // 351000 // 100000 = 3 → 😐; filled = round(0.35*8)=3
+  assert.equal(item.text, "😐 ███░░░░░ 35% 351k/1M 💬 5");
+  assert.equal(item.short, "😐 35%");
+  // Plain text (no ANSI/tmux markup); emoji count as wide in visibleWidth.
+  assert.equal(item.text.includes("#[fg="), false);
+  assert.ok(visibleWidth(item.text) >= 20);
+});
+
+test("buildAccountSliderItem 5h from used+cap (Python _slider plain core)", () => {
+  // 2.7M / 57.0M ≈ 4.74% → empty bar, notice (cyan) role
+  const item = buildAccountSliderItem("account5h", {
+    used: 2700000,
+    cap: 57000000,
+  });
+  assert.equal(item.id, "account5h");
+  assert.equal(item.role, "notice");
+  assert.equal(item.text, "🕐 ░░░░░░░░ 2.7M/57.0M");
+  assert.equal(item.short, "🕐 2.7M");
+  assert.equal(item.priority, 30);
+});
+
+test("buildAccountSliderItem weekly from usedPercentage + cap", () => {
+  const item = buildAccountSliderItem("accountWeekly", {
+    usedPercentage: 50,
+    cap: 270000000,
+  });
+  assert.equal(item.id, "accountWeekly");
+  assert.equal(item.role, "ok"); // 50% → ok (green band)
+  assert.equal(item.priority, 20);
+  // used = round(0.5 * 270M) = 135000000 → 135.0M
+  assert.equal(item.text, "📅 ████░░░░ 135.0M/270.0M");
+});
+
+test("buildModelItem / buildStateItem null on empty", () => {
+  assert.equal(buildModelItem(""), null);
+  assert.equal(buildStateItem(""), null);
+  assert.deepEqual(buildModelItem("Opus 🧠xhigh"), {
+    id: "model",
+    text: "Opus 🧠xhigh",
+    role: "accent",
+    priority: 60,
+  });
+  assert.deepEqual(buildStateItem("▶"), {
+    id: "state",
+    text: "▶",
+    role: "dim",
+    priority: 90,
+  });
+});
+
+test("REGISTRY + orderSegments respects bars.segments enabled/order/priority", () => {
+  const ordered = orderSegments(REGISTRY, {
+    segments: {
+      model: { enabled: true },
+      account5h: { enabled: false },
+      clock: { enabled: false },
+      notify: { enabled: false },
+    },
+  });
+  const ids = ordered.map((s) => s.id);
+  assert.ok(ids.includes("context"));
+  assert.ok(ids.includes("model"));
+  assert.ok(ids.includes("state"));
+  assert.ok(!ids.includes("account5h"));
+  // order: context 10, state 15, model 20, accountWeekly 60
+  assert.deepEqual(
+    ids.filter((id) =>
+      ["context", "state", "model", "accountWeekly"].includes(id),
+    ),
+    ["context", "state", "model", "accountWeekly"],
+  );
+});
+
+test("REGISTRY render fns produce items from compute-shaped ctx", () => {
+  const ctx = {
+    session: {
+      context: { used: 351000, win: 1000000, pct: 35, messages: 5 },
+      modelBadge: "Opus 🧠xhigh",
+      stateGlyph: "▶",
+    },
+    account: {
+      fiveHour: { usedPercentage: 12.3 },
+      weekly: { usedPercentage: 45 },
+      caps: { fiveHourCap: 57000000, weeklyCap: 270000000 },
+    },
+    clockText: "14:30",
+    notifyIcon: "🌙",
+  };
+  const ctxItem = REGISTRY.context.render(ctx);
+  assert.equal(ctxItem.text, "😐 ███░░░░░ 35% 351k/1M 💬 5");
+  assert.equal(REGISTRY.model.render(ctx).text, "Opus 🧠xhigh");
+  assert.equal(REGISTRY.state.render(ctx).text, "▶");
+  assert.equal(REGISTRY.clock.render(ctx).text, "14:30");
+  assert.equal(REGISTRY.notify.render(ctx).text, "🌙");
+  const a5 = REGISTRY.account5h.render(ctx);
+  assert.equal(a5.id, "account5h");
+  assert.match(a5.text, /^🕐 /);
+  assert.match(a5.text, /57\.0M$/);
+});
