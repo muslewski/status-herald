@@ -11,6 +11,9 @@ const ev = (o) => ({
   event: "Stop",
   agentId: "",
   notificationType: "",
+  requiresAttention:
+    o.notificationType === "permission_prompt" ||
+    o.notificationType === "agent_error",
   hasTasks: false,
   subagents: 0,
   shells: 0,
@@ -220,6 +223,12 @@ test("a permission prompt beats a running subagent", () => {
   assert.equal(nextState(STATES.WORKING, n, { subagents: 3 }), STATES.NEEDS);
 });
 
+test("Stop preserves a pending NEEDS (real approval beats final Stop)", () => {
+  // Grok Stop can arrive while a permission is pending; must not clobber NEEDS.
+  const stop = ev({ event: "Stop", subagents: 0, hasTasks: true });
+  assert.equal(nextState(STATES.NEEDS, stop), STATES.NEEDS);
+});
+
 test("Stop trusts its own payload over the stored counts", () => {
   // Stop always carries background_tasks, so a stale stored count must not
   // resurrect WORKING once the subagents have actually drained.
@@ -282,7 +291,50 @@ test("Grok approval_required notification maps to NEEDS", () => {
     }),
   );
   assert.equal(p.notificationType, "permission_prompt");
+  assert.equal(p.requiresAttention, true);
   assert.equal(nextState(STATES.WORKING, p), STATES.NEEDS);
+});
+
+test("Grok auto-approved permission does not set NEEDS (requiresAttention false)", () => {
+  // For Grok with always-approve or auto-resolved tools, the payload may include
+  // decision, so we should not treat as needing user action (avoids false NEEDS
+  // and sounds for tool finished cases).
+  const p = parseHookPayload(
+    JSON.stringify({
+      hookEventName: "notification",
+      notificationType: "approval_required",
+      permissionDecision: "allow",
+    }),
+  );
+  assert.equal(p.notificationType, "permission_prompt");
+  assert.equal(p.requiresAttention, false);
+  assert.equal(nextState(STATES.WORKING, p), STATES.WORKING);
+});
+
+test("late Grok approval_required after DONE does not create false NEEDS", () => {
+  // Grok tool/background completions can emit approval_required *after* final Stop
+  // (which set DONE). Must not flash NEEDS.
+  const n = ev({
+    event: "Notification",
+    notificationType: "permission_prompt",
+  });
+  assert.equal(nextState(STATES.DONE, n), STATES.DONE);
+});
+
+test("Grok tool-finish approval_required is treated as non-attention (tool markers)", () => {
+  // Grok often emits approval_required for tool completions / background finishes.
+  // These must not set NEEDS or trigger sounds.
+  const p = parseHookPayload(
+    JSON.stringify({
+      hookEventName: "notification",
+      notificationType: "approval_required",
+      tool_use_id: "some-tool-123",
+      message: "tool finished",
+    }),
+  );
+  assert.equal(p.notificationType, "permission_prompt");
+  assert.equal(p.requiresAttention, false);
+  assert.equal(nextState(STATES.DONE, p), STATES.DONE);
 });
 
 test("an unknown event leaves the state alone", () => {
@@ -292,15 +344,18 @@ test("an unknown event leaves the state alone", () => {
   );
 });
 
-test("PostToolUse clears a stale NEEDS/COMPACTING/DONE back to working", () => {
+test("PostToolUse clears a stale NEEDS/COMPACTING back to working (but not a settled DONE)", () => {
   // Claude Code fires no event when a block clears -- the tool the agent ran is
-  // the only proof it is active again. A permission_prompt that set NEEDS, a
-  // PreCompact that set COMPACTING, or a DONE the turn has since moved past all
-  // clear to WORKING on the next tool.
+  // the only proof it is active again. A permission_prompt that set NEEDS or a
+  // PreCompact that set COMPACTING clear to WORKING on the next tool.
+  //
+  // We deliberately do NOT clear DONE: in Grok, toolresult / PostToolUse events
+  // for background completions can arrive *after* the final Stop (which set
+  // DONE with 0 subs). Clearing would cause DONE -> WORKING a few seconds later.
   const t = ev({ event: "PostToolUse" });
   assert.equal(nextState(STATES.NEEDS, t), STATES.WORKING);
   assert.equal(nextState(STATES.COMPACTING, t), STATES.WORKING);
-  assert.equal(nextState(STATES.DONE, t), STATES.WORKING);
+  assert.equal(nextState(STATES.DONE, t), STATES.DONE);
 });
 
 test("PostToolUse normalizes from Claude snake and camelCase shapes", () => {
