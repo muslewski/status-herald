@@ -3,7 +3,7 @@
 **Design:** `docs/superpowers/specs/2026-07-13-herald-plan-quality-revision-design.md`  
 **Ops plan:** `docs/superpowers/plans/2026-07-14-herald-plan-quality-revision.md`  
 **Mode:** revise-executed (Grok 4.5 auditors + fix-plan executors)  
-**Scope:** C1–C6 (plans 013–019 landed). Plan 020 was frozen during the campaign.
+**Scope:** C1–C6 (plans 013–019 landed). Plan 020 was frozen during revision; **020 surfaces now landed** (cutover remains 021).
 
 ## WIP freeze
 

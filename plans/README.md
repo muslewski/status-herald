@@ -45,7 +45,7 @@ invariant.
 | 017 | Herald-native status bars (program / Slice 2) | P1 | XL | curtain | SPEC (program umbrella) |
 | 018 | Status engine (segments, roles, width-drop) | P1 | M | 017 | DONE (landed; quality-revision Phase 3) |
 | 019 | Status compute + bridges | P1 | M | 018 | DONE (landed; quality-revision Phase 3) |
-| 020 | Status surfaces wiring | P1 | L | 019 | PARTIAL / FROZEN — out of quality-revision until campaign close |
+| 020 | Status surfaces wiring | P1 | L | 019 | DONE (landed; cutover is 021) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
 REJECTED (with one-line rationale) | SUPERSEDED | PARTIAL | FROZEN
