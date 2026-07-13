@@ -26,6 +26,22 @@ test("card loop reveals (restoring the bar) on exit/signal", () => {
   assert.match(script, /curtain reveal/, "trap path reveals");
 });
 
+// refreshCards kills _curtain; EXIT trap must not reveal mid-refresh or the
+// session ends covered=0 with the card selected (keypress no-op, bar desync).
+test("card EXIT trap skips reveal while @herald_refreshing is set", () => {
+  assert.match(
+    script,
+    /@herald_refreshing|herald_refreshing/,
+    "trap consults refreshing flag",
+  );
+  // Fail-open: only skip when flag is exactly 1; otherwise still reveal.
+  assert.match(
+    script,
+    /\[\s*"\$r"\s*=\s*"1"\s*\]\s*\|\|\s*herald curtain reveal/,
+    "skip reveal only when refreshing=1",
+  );
+});
+
 // settleAfter freezes once tick > settleAfter (pickFrame). A monotonic tick from
 // arm means DONE after a long WORKING session already has tick ≫ settleAfter and
 // never animates. Reset tick when @herald_state changes so the first frame of a
