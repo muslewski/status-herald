@@ -4,9 +4,10 @@ import {
   mkdtempSync as _mk,
   rmSync as _rm,
   writeFileSync as _wf,
+  readFileSync,
 } from "node:fs";
 import { tmpdir as _td } from "node:os";
-import { join as _j } from "node:path";
+import { join as _j, dirname, join } from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
 
@@ -126,4 +127,22 @@ test("curtain focus normalizes a [mosh] prefix before matching (no throw off-tmu
   // normalized path runs without throwing and exits cleanly.
   const out = runCli(["curtain", "focus", "[mosh] Something"]);
   assert.equal(typeof out, "string");
+});
+
+test("curtain status uses session-scoped @herald_state (not pane getOpt alone)", () => {
+  const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+  const src = readFileSync(join(root, "lib/cli.mjs"), "utf8");
+  // status case must resolve session and use getSessOpt for @herald_state
+  assert.match(src, /case "status"/);
+  const statusBlock = src.slice(
+    src.indexOf('case "status"'),
+    src.indexOf('case "install"'),
+  );
+  assert.match(statusBlock, /sessionOf/);
+  assert.match(statusBlock, /getSessOpt/);
+  assert.doesNotMatch(
+    statusBlock,
+    /getOpt\(\s*pane\s*,\s*["']@herald_state["']\s*\)/,
+    "must not read @herald_state via pane getOpt",
+  );
 });
