@@ -43,10 +43,10 @@
 
 | Plan | Parent | Cluster | Severity | Status |
 |------|--------|---------|----------|--------|
-| r001 | 013 / per-tab | C1 | P1 | TODO |
-| r002 | 013 / config | C1 | P1 | TODO |
-| r003 | install/grid | C1 | P2 | TODO |
-| r004 | 013/014 tests | C1+C2 | P1 | TODO |
+| r001 | 013 / per-tab | C1 | P1 | IN PROGRESS |
+| r002 | 013 / config | C1 | P1 | IN PROGRESS |
+| r003 | install/grid | C1 | P2 | IN PROGRESS |
+| r004 | 013/014 tests | C1+C2 | P1 | IN PROGRESS |
 
 
 ## Findings disposition log
@@ -74,10 +74,10 @@
 
 | Plan | Parent | Cluster | Severity | Status |
 |------|--------|---------|----------|--------|
-| r001 | 013 / per-tab | C1 | P1 | TODO |
-| r002 | 013 / config | C1 | P1 | TODO |
-| r003 | install/grid | C1 | P2 | TODO |
-| r004 | 013/014 tests | C1+C2 | P1 | TODO |
+| r001 | 013 / per-tab | C1 | P1 | IN PROGRESS |
+| r002 | 013 / config | C1 | P1 | IN PROGRESS |
+| r003 | install/grid | C1 | P2 | IN PROGRESS |
+| r004 | 013/014 tests | C1+C2 | P1 | IN PROGRESS |
 
 ## Explicit out of scope (do not audit as gaps)
 
