@@ -1,95 +1,82 @@
 # Plan Quality Revision — Campaign Index
 
-**Design:** `docs/superpowers/specs/2026-07-13-herald-plan-quality-revision-design.md`
-**Ops plan:** `docs/superpowers/plans/2026-07-14-herald-plan-quality-revision.md`
-**Mode:** revise-executed (Grok 4.5 auditors + fix-plan executors)
-**Scope:** C1–C6 (plans 013–019 landed). **Frozen:** Plan 020 + partial surfaces.
+**Design:** `docs/superpowers/specs/2026-07-13-herald-plan-quality-revision-design.md`  
+**Ops plan:** `docs/superpowers/plans/2026-07-14-herald-plan-quality-revision.md`  
+**Mode:** revise-executed (Grok 4.5 auditors + fix-plan executors)  
+**Scope:** C1–C6 (plans 013–019 landed). Plan 020 was frozen during the campaign.
 
 ## WIP freeze
 
-- WIP freeze: branch wip/020-partial @ 56b4615
+- WIP freeze: branch `wip/020-partial` @ `56b4615`
 
-## Baseline (Phase 0)
+## Baseline
 
-- Measured at: `4fd7000`
-- `node --test`: `224 pass / 0 fail`
-- biome: `./node_modules/.bin/biome` available: yes (1.9.4)
-- `biome check .`: exit 1 — 3 pre-existing fixture format nits (record, do not fix): `test/fixtures/session-meta-test-sid-1234.json`, `test/fixtures/token-forecast-snapshot.json`, `test/fixtures/session-sample.json`
+| When | Suite |
+|------|--------|
+| Phase 0 | 224 pass / 0 fail @ `4fd7000` |
+| Campaign close | **242 pass / 0 fail** @ `037b0ff` |
+
+biome: `./node_modules/.bin/biome` 1.9.4 available. Whole-tree check still has 3 pre-existing fixture format nits (not fixed).
 
 ## Clusters
 
-| ID | Plans | Primary paths | Key commits (evidence) | Audit status |
-|----|-------|---------------|------------------------|--------------|
-| C1 | 013 curtain + per-tab | `lib/curtain/{session,orchestrator,tmux,state,grid,install,hook,debug}.mjs`, curtain CLI, `scripts/curtain-card-*.sh` | `a0699c8`..`a147449`, `b49f8b8`, `f278209` | REVISED |
-| C2 | 014 | `lib/curtain/themes.mjs`, hook/state | `479da55` | REVISED |
-| C3 | 015 | `mac/herald-focus.lua`, `scripts/focus-agent/*`, systemd unit, config keys | `6046ad2`..`5b661c7` | REVISED |
-| C4 | 016 | card loop/session, bar save/restore | `30c702c`..`442bfbf` | REVISED |
-| C5 | 018 | `lib/status/segments.mjs`, `lib/render.mjs` | `ef1b148`..`ec7b75e` | REVISED |
-| C6 | 019 | `lib/status/{compute,grok-adapter,bridge-token-forecast}.mjs` | `1aa506e` | REVISED |
+| ID | Plans | Audit status |
+|----|-------|--------------|
+| C1 | 013 curtain + per-tab | REVISED (r001–r003) |
+| C2 | 014 themes | REVISED (r004) |
+| C3 | 015 event focus | REVISED (r005) |
+| C4 | 016 anim + bar | REVISED (r006–r007) |
+| C5 | 018 status engine | REVISED (r009) |
+| C6 | 019 compute/bridges | REVISED (r008) |
 
 ## Phases
 
 | Phase | Status | Notes |
 |-------|--------|-------|
-| 0 Inventory + index + freeze | DONE | freeze wip/020-partial@56b4615; baseline 224 pass |
-| 1 C1+C2 audit/fix | DONE | r001-r004 |
-| 2 C3+C4 audit/fix | DONE | r005-r007 |
-| 3 C5+C6 audit/fix | DONE | r008-r009 |
+| 0 Inventory + index + freeze | DONE | `wip/020-partial@56b4615` |
+| 1 C1+C2 audit/fix | DONE | r001–r004 |
+| 2 C3+C4 audit/fix | DONE | r005–r007 |
+| 3 C5+C6 audit/fix | DONE | r008–r009 |
 | 4 Cross-cutting residual | DONE | no new P0/P1; P2/P3 deferred |
-| Campaign closed | DONE | Green light for 020: YES (with residual DEFERs) |
+| Campaign closed | DONE | **Green light for 020: YES** |
 
+## Fix-plans
 
-## Fix-plans (`plans/rNNN-*.md`)
+| Plan | Parent | Cluster | Sev | Status |
+|------|--------|---------|-----|--------|
+| r001 | 013 | C1 | P1 | DONE — status reads session-scoped `@herald_state` |
+| r002 | 013 | C1 | P1 | DONE — `coverableStates` + compacting default |
+| r003 | install/grid | C1 | P2 | DONE — entry-level hook drop + absolute grid hooks |
+| r004 | 014 | C2 | P1 | DONE — framed forge keeps dynamic info lines (test) |
+| r005 | 015 | C3 | P1 | DONE — no unit `reveal-all` on failure restart; heartbeat truncate |
+| r006 | 016 | C4 | P1 | DONE — reset card tick on state change (`settleAfter`) |
+| r007 | 016 | C4 | P1 | DONE — `refreshCards` survives EXIT trap |
+| r008 | 019 | C6 | P1 | DONE — hermetic token-forecast, discovery `ppid`, injectable paths |
+| r009 | 018 | C5 | P1 | DONE — width-drop rightmost multi-drop test |
 
-| Plan | Parent | Cluster | Severity | Status |
-|------|--------|---------|----------|--------|
-| r001 | 013 / per-tab | C1 | P1 | DONE |
-| r002 | 013 / config | C1 | P1 | DONE |
-| r003 | install/grid | C1 | P2 | DONE |
-| r004 | 013/014 tests | C1+C2 | P1 | DONE |
+## Findings disposition (high-signal)
 
-
-## Findings disposition log
-
-| ID | Cluster | Severity | Summary | Disposition |
-|----|---------|----------|---------|-------------|
-| C1a-F1 | C1 | P1 | status reads pane opts; stamps are session-scoped | DONE |
-| C1a-F2 | C1 | P1 | coverableStates config ignored | DONE |
-| C1a-F3 | C1 | P2 | grid orchestrator omits compacting | DONE |
-| C1a-F4 | C1 | P2 | missing Grok Stop synthesis test | DONE |
-| C1a-F5 | C1 | P2 | missing compacting cover test | DONE |
-| C1b-F1 | C1 | P2 | install drops whole hook group | DONE |
-| C1b-F5 | C1 | P2 | grid hooks bare herald | DONE |
-| C2-F1 | C2 | P1 | framed card tests omit dynamic info lines | DONE |
-| C1a-F6 | C1 | P2 | focus title ambiguity tie-break | DEFERRED |
-| C1a-F7 | C1 | P3 | legacy event path pane stamp | DEFERRED |
-| C1a-F8 | C1 | P3 | disarm leaves stale @herald_* | DEFERRED |
-| C1b-F2 | C1 | P2 | disarm order weak-test | DEFERRED |
-| C1b-F3 | C1 | P2 | keypress reveal weak-test | DEFERRED |
-| C1b-F4 | C1 | P2 | doctor short of design §6.6 | DEFERRED |
-| C1b-F6 | C1 | P3 | no bash -n card script test | DEFERRED |
-| C2-F2..F8 | C2 | P2/P3 | additional theme weak-tests | DEFERRED |
-
-## Fix-plans (`plans/rNNN-*.md`)
-
-| Plan | Parent | Cluster | Severity | Status |
-|------|--------|---------|----------|--------|
-| r001 | 013 / per-tab | C1 | P1 | DONE |
-| r002 | 013 / config | C1 | P1 | DONE |
-| r003 | install/grid | C1 | P2 | DONE |
-| r004 | 013/014 tests | C1+C2 | P1 | DONE |
-
-## Explicit out of scope (do not audit as gaps)
-
-- `lib/status/tmux-status.mjs`, `lib/status/background.mjs`, `test/status-surfaces.test.mjs`, `plans/020-*`
-- Plans 002–012 generic engine (superseded per `plans/017-herald-native-bars.md`)
-- Live tmux sessions / operator `~/.claude` mutation
-
+| ID | Sev | Disposition |
+|----|-----|-------------|
+| C1a-F1 status pane vs session | P1 | DONE r001 |
+| C1a-F2 coverableStates ignored | P1 | DONE r002 |
+| C1a-F3 grid omits compacting | P2 | DONE r002 |
+| C1b-F1 install whole-group drop | P2 | DONE r003 |
+| C1b-F5 bare herald grid hooks | P2 | DONE r003 |
+| C2-F1 framed info lines | P1 | DONE r004 |
+| C3-F1 ExecStopPost reveal-all | P1 | DONE r005 |
+| C3-F2 heartbeat no truncate | P2 | DONE r005 |
+| C4-F1 settleAfter absolute tick | P1 | DONE r006 |
+| C4-F2 refreshCards trap race | P1 | DONE r007 |
+| C6-F1 fixture wall-clock | P1 | DONE r008 |
+| C6-F2 discovery ppid | P1 | DONE r008 |
+| C6-F3 injectable paths | P1 | DONE r008 |
+| C5 multi-drop tie-break test | P1 | DONE r009 |
+| Focus title tie-break, doctor §6.6, extra weak-tests | P2–P3 | **DEFERRED** |
 
 ## Campaign close
 
-- Final baseline: re-measure at close commit
-- r001–r009: DONE (merged)
-- Green light for Plan 020: **YES**
-- Residual: deferred P2/P3 weak-tests and product polish (focus title tie-break, doctor §6.6, more theme/compute edges) — see findings log
-- By-design: never-built 002–012 superseded; 020 was frozen during campaign
+- **Green light for Plan 020: YES** (foundations revised; resume from `wip/020-partial` or re-apply WIP)
+- Residual DEFER list is non-blocking polish
+- By-design: 002–012 never-built / superseded per Plan 017
+- WIP: restore with `git cherry-pick` / merge `wip/020-partial` when ready (do not force-drop)
