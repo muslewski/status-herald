@@ -144,15 +144,32 @@ test("shortModelBadge reproduces python families + effort glyph", () => {
 // ===== Task 4 bridge (read + feed) =====
 
 test("readAccountUsage from fixture snapshot", async () => {
+  // Hermetic: pin now before fixture resets_at so wall-clock cannot stale the windows
   const u = await readAccountUsage({
     snapshotPath: "test/fixtures/token-forecast-snapshot.json",
+    now: 1783950000,
   });
   assert.ok(u.fiveHour);
   assert.equal(u.fiveHour.usedPercentage, 12.3);
+  assert.equal(u.fiveHour.stale, false);
   assert.ok(u.weekly);
   assert.equal(u.weekly.usedPercentage, 45.0);
+  assert.equal(u.weekly.stale, false);
   // caps come from defaults or limits when present
   assert.ok(u.caps && u.caps.fiveHourCap > 0);
+});
+
+test("readAccountUsage respects injectable now for secsToReset", async () => {
+  const now = 1783950000;
+  const u = await readAccountUsage({
+    snapshotPath: "test/fixtures/token-forecast-snapshot.json",
+    now,
+  });
+  // five_hour resets_at 1784000000 → 50000s remaining at pinned now
+  assert.equal(u.fiveHour.resetsAt, 1784000000);
+  assert.equal(u.fiveHour.secsToReset, 1784000000 - now);
+  assert.equal(u.weekly.resetsAt, 1785000000);
+  assert.equal(u.weekly.secsToReset, 1785000000 - now);
 });
 
 test("feedSnapshot is best-effort and does not throw", async () => {
@@ -180,9 +197,67 @@ test("discoverLiveClaudeSessions with fixture dir returns matching live sessions
   });
 });
 
+test("discoverLiveClaudeSessions attaches ppid for live pid", async () => {
+  await withTempDir(async (tmp) => {
+    const sessDir = path.join(tmp, "sessions");
+    await fs.mkdir(sessDir);
+    const expectedPpid = readProcStatusPpid(process.pid);
+    const session = {
+      pid: process.pid,
+      sessionId: "live-sid-ppid",
+      cwd: "/tmp",
+      name: "Live",
+      status: "busy",
+      statusUpdatedAt: 1783950000000,
+    };
+    await fs.writeFile(
+      path.join(sessDir, "live-sid-ppid.json"),
+      JSON.stringify(session),
+    );
+    const found = await discoverLiveClaudeSessions({ sessionsDir: sessDir });
+    assert.equal(found.length, 1);
+    assert.equal(found[0].pid, process.pid);
+    assert.equal(found[0].sessionId, "live-sid-ppid");
+    assert.equal(found[0].ppid, expectedPpid);
+    assert.ok(typeof found[0].ppid === "number" && found[0].ppid > 0);
+  });
+});
+
 test("buildPerSessionData + grok path returns degraded but valid shape", async () => {
   const data = await buildPerSessionData("missing-sid", process.pid);
   assert.ok(data);
   assert.ok("context" in data);
   assert.ok(typeof data.modelBadge === "string");
+});
+
+test("buildPerSessionData with injectable dirs loads transcript + meta", async () => {
+  await withTempDir(async (tmp) => {
+    const sessionId = "test-sid-1234";
+    const projectsDir = path.join(tmp, "projects");
+    const metaDir = path.join(tmp, "session-meta");
+    // projects/<encoded-cwd>/<sessionId>.jsonl — walk finds by filename
+    const projLeaf = path.join(projectsDir, "-tmp-testrepo");
+    await fs.mkdir(projLeaf, { recursive: true });
+    await fs.mkdir(metaDir, { recursive: true });
+    await fs.copyFile(
+      "test/fixtures/transcript-claude-sample.jsonl",
+      path.join(projLeaf, `${sessionId}.jsonl`),
+    );
+    await fs.copyFile(
+      "test/fixtures/session-meta-test-sid-1234.json",
+      path.join(metaDir, `${sessionId}.json`),
+    );
+
+    const data = await buildPerSessionData(sessionId, null, {
+      projectsDir,
+      metaDir,
+    });
+    assert.equal(data.sessionId, sessionId);
+    // transcript: latestUsed=400, messages after compact=1, opus window 1M
+    assert.equal(data.context.used, 400);
+    assert.equal(data.context.messages, 1);
+    assert.equal(data.messages, 1);
+    // meta fixture: Opus 4.8 + effort xhigh
+    assert.equal(data.modelBadge, "Opus 🧠xhigh");
+  });
 });
