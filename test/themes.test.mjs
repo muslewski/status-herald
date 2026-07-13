@@ -65,3 +65,16 @@ test("forge is a transparent, animated theme", () => {
   assert.ok(BUILTINS.forge.states.working.frames.length >= 2);
   assert.equal(isAnimated(BUILTINS.forge), true);
 });
+
+test("forge done and compacting are animated with a settle on done", () => {
+  assert.ok(BUILTINS.forge.states.done.frames.length >= 2);
+  assert.equal(BUILTINS.forge.states.done.settleAfter, 6);
+  assert.ok(BUILTINS.forge.states.compacting.frames.length >= 2);
+  assert.equal(BUILTINS.forge.states.compacting.settleAfter, undefined);
+});
+
+test("minimal gains animated done/compacting but keeps working static", () => {
+  assert.ok(BUILTINS.minimal.states.done.frames.length >= 2);
+  assert.ok(!BUILTINS.minimal.states.working.frames);
+  assert.equal(isAnimated(BUILTINS.minimal), true);
+});

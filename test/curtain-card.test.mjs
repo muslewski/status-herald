@@ -276,3 +276,64 @@ test("renderCardFrame erases to end of line on each row (anti-ghost)", () => {
   // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC (\x1b) is the literal byte that opens an SGR sequence; intentional.
   assert.doesNotMatch(out, /\x1b\[2J/); // still no full-screen clear
 });
+
+test("settleAfter freezes an animated state on its last frame", () => {
+  const theme = {
+    background: "transparent",
+    states: {
+      done: {
+        fg: 32,
+        label: "DONE",
+        frames: [["AAA"], ["BBB"], ["CCC"]],
+        settleAfter: 3,
+      },
+    },
+  };
+  const at = (tick) =>
+    renderCard("done", 0, 20, 8, {}, theme, tick).map(plain).join("\n");
+  assert.match(at(0), /AAA/); // animating
+  assert.match(at(1), /BBB/);
+  assert.match(at(2), /CCC/);
+  assert.match(at(3), /AAA/); // tick 3 == settleAfter -> still cycling (3 % 3)
+  assert.match(at(4), /CCC/, "past settleAfter -> frozen on last frame");
+  assert.match(at(50), /CCC/, "stays frozen");
+});
+
+test("forge DONE animates sparks then settles on the clean piece", () => {
+  const sparks = renderCard("done", 0, 24, 8, {}, BUILTINS.forge, 0)
+    .map(plain)
+    .join("\n");
+  assert.match(sparks, /\* ✓ \*/, "tick 0 shows sparks over the anvil");
+  assert.match(sparks, /=======/, "keeps the anvil");
+  const settled = renderCard("done", 0, 24, 8, {}, BUILTINS.forge, 99)
+    .map(plain)
+    .join("\n");
+  assert.doesNotMatch(settled, /\*/, "settled frame has no sparks");
+  assert.match(settled, /✓/);
+});
+
+test("forge COMPACTING squeezes inward and loops (no settle)", () => {
+  const at = (t) =>
+    renderCard("compacting", 0, 24, 8, {}, BUILTINS.forge, t)
+      .map(plain)
+      .join("\n");
+  assert.match(at(0), /# # #/, "widest at tick 0");
+  assert.match(at(2), /»#«/, "tightest mid-cycle");
+  assert.match(at(4), /# # #/, "loops back — compacting never freezes");
+});
+
+test("minimal DONE blinks a smile then settles", () => {
+  const at = (t) =>
+    renderCard("done", 0, 24, 8, {}, BUILTINS.minimal, t).map(plain).join("\n");
+  assert.match(at(0), /\^o\^/);
+  assert.match(at(99), /\^_\^/, "settles on the calm smile");
+});
+
+test("minimal COMPACTING collapses dots to the center", () => {
+  const at = (t) =>
+    renderCard("compacting", 0, 24, 8, {}, BUILTINS.minimal, t)
+      .map(plain)
+      .join("\n");
+  assert.match(at(0), /· · · · ·/);
+  assert.match(at(2), /···/);
+});
