@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 
 const script = readFileSync(
   fileURLToPath(new URL("../scripts/curtain-card-session.sh", import.meta.url)),
