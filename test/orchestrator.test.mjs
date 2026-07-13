@@ -114,6 +114,22 @@ test("onFocusOut re-covers a working live pane", () => {
   assert.equal(t.calls.swaps.length, 1);
 });
 
+test("onFocusOut covers compacting live pane", () => {
+  const t = fake({
+    opts: {
+      "%5": {
+        "@herald_role": "live",
+        "@herald_peer": "%9",
+        "@herald_state": "compacting",
+      },
+      "%9": { "@herald_peer": "%5" },
+    },
+    win: { "%5": "grid", "%9": "_holding" },
+  });
+  onFocusOut("%5", t);
+  assert.equal(t.calls.swaps.length, 1);
+});
+
 test("onFocusOut ignores an idle live pane", () => {
   const t = fake({
     opts: {

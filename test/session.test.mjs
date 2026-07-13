@@ -111,6 +111,32 @@ test("cover switches to the card window only when state is coverable", () => {
   assert.equal(t.getSessOpt("s1", "@herald_covered"), "1");
 });
 
+test("cover covers compacting state", () => {
+  // Inject cfg so this does not depend on the operator's real config.json
+  // (which may still list only the pre-r002 three coverable states).
+  const t = makeT(freshSession());
+  arm("s1", t, {});
+  t.setSessOpt("s1", "@herald_state", "compacting");
+  cover("s1", t, {});
+  assert.equal(t.getSessOpt("s1", "@herald_covered"), "1");
+});
+
+test("coverableStates config can exclude done", () => {
+  const t = makeT(freshSession());
+  const cfg = { coverableStates: ["working", "needs", "compacting"] };
+  arm("s1", t, cfg);
+  t.setSessOpt("s1", "@herald_state", "done");
+  cover("s1", t, cfg);
+  assert.equal(
+    t.getSessOpt("s1", "@herald_covered"),
+    "0",
+    "done not coverable",
+  );
+  t.setSessOpt("s1", "@herald_state", "working");
+  cover("s1", t, cfg);
+  assert.equal(t.getSessOpt("s1", "@herald_covered"), "1");
+});
+
 test("reveal restores the remembered live window", () => {
   const t = makeT(freshSession());
   arm("s1", t);
@@ -457,6 +483,34 @@ test("id-set: a Stop task list reconciles a leaked synthesized count", () => {
   );
   assert.equal(t.getSessOpt("s1", "@herald_bg_subagents"), "0", "reconciled");
   assert.equal(t.getSessOpt("s1", "@herald_state"), "done");
+});
+
+test("id-set: Grok Stop without tasks keeps WORKING while subagent ids remain", () => {
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  const start = (id) => ({
+    event: "SubagentStart",
+    agentId: id,
+    hasTasks: false,
+    subagents: 0,
+    shells: 0,
+    subagentIds: [],
+  });
+  stampFromHook("%9", start("g1"), 1000, t);
+  stampFromHook(
+    "%9",
+    {
+      event: "Stop",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+    },
+    2000,
+    t,
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "working");
+  assert.equal(t.getSessOpt("s1", "@herald_bg_subagents"), "1");
 });
 
 test("stampFromHook writes a heartbeat on every event", () => {
