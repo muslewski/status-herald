@@ -26,6 +26,14 @@ test("card loop reveals (restoring the bar) on exit/signal", () => {
   assert.match(script, /curtain reveal/, "trap path reveals");
 });
 
+// HUP from tmux kill-window must exit the process. A trap that only cleans up
+// and returns leaves orphan loops painting dead ttys (100+ glitch fleet).
+test("card loop exits on HUP/INT/TERM (no orphan after refresh)", () => {
+  assert.match(script, /trap 'exit \d+' HUP/, "HUP exits the process");
+  assert.match(script, /trap 'exit \d+' INT/, "INT exits the process");
+  assert.match(script, /trap 'exit \d+' TERM/, "TERM exits the process");
+});
+
 // refreshCards kills _curtain; EXIT trap must not reveal mid-refresh or the
 // session ends covered=0 with the card selected (keypress no-op, bar desync).
 test("card EXIT trap skips reveal while @herald_refreshing is set", () => {

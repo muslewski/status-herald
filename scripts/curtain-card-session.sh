@@ -8,11 +8,23 @@
 # fallback, and reveal always targets the live name.
 set -u
 printf '\033[?25l'
-# On any exit/signal, reveal — which (when tmuxBar coupling is on) restores the
-# status bar, so a killed loop can't strand the dropped background.
+# On exit, reveal — which (when tmuxBar coupling is on) restores the status bar,
+# so a killed loop can't strand the dropped background.
 # Skip when refreshCards is mid kill/recreate (@herald_refreshing=1); otherwise
 # the trap would uncover under the freshly selected card (keypress no-op).
-trap 's=$(tmux display -p "#{session_name}" 2>/dev/null); r=$(tmux show -t "$s" -v @herald_refreshing 2>/dev/null || true); [ "$r" = "1" ] || herald curtain reveal "$s" >/dev/null 2>&1 || true' EXIT INT TERM HUP
+#
+# CRITICAL: HUP/INT/TERM must *exit*, not only run cleanup. Bash trap on HUP
+# that returns continues the loop — after `tmux kill-window` the orphan keeps
+# painting a dead tty and fleets accumulate 100+ glitching card processes.
+cleanup() {
+  s=$(tmux display -p "#{session_name}" 2>/dev/null)
+  r=$(tmux show -t "$s" -v @herald_refreshing 2>/dev/null || true)
+  [ "$r" = "1" ] || herald curtain reveal "$s" >/dev/null 2>&1 || true
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap 'exit 129' HUP
 tick=0
 while :; do
   # One untargeted call dumps every option this repaint needs from the current

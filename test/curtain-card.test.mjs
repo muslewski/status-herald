@@ -234,6 +234,39 @@ test("forge working art keeps the head centered over the anvil", () => {
   );
 });
 
+test("forge DONE settled frame keeps checkmark centered on the anvil", () => {
+  // Regression: trailing spaces in "   ✓   " were stripped so ✓ sat left of =======.
+  const cols = 40;
+  const lines = renderCard(
+    "done",
+    0,
+    cols,
+    12,
+    { worked: 99 },
+    BUILTINS.forge,
+    99,
+  ).map(plain);
+  const inkCenter = (l) => {
+    const lead = l.length - l.trimStart().length;
+    const t = l.replace(/\s+$/, "");
+    return (lead + t.length) / 2;
+  };
+  const anvil = lines.find((l) => /=======/.test(l));
+  const check = lines.find((l) => l.includes("✓"));
+  assert.ok(anvil && check, "expected anvil + checkmark rows");
+  assert.ok(
+    Math.abs(inkCenter(check) - inkCenter(anvil)) <= 1,
+    `check center ${inkCenter(check)} vs anvil ${inkCenter(anvil)}`,
+  );
+  // Label axis should match art block center (within 1 col).
+  const label = lines.find((l) => /^\s*DONE\s*$/.test(l));
+  assert.ok(label, "DONE label present");
+  assert.ok(
+    Math.abs(inkCenter(label) - inkCenter(anvil)) <= 1,
+    `DONE center ${inkCenter(label)} vs anvil ${inkCenter(anvil)}`,
+  );
+});
+
 // Plan 014 contract: theme owns art; herald still owns dynamic info under frames.
 // Forge geometry tests alone would pass if info concat were dropped.
 test("forge framed working card still shows elapsed and subagent info under art", () => {

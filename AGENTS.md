@@ -101,6 +101,14 @@ herald curtain uninstall grok   # native
 
 Re-arm sessions after upgrade for sub counts: `herald curtain disarm && herald curtain arm`
 
+After upgrading the card loop / renderer, **refresh** so every `_curtain` window respawns with the new script (state is preserved):
+
+```bash
+herald curtain refresh
+```
+
+If cards look double-glitched or CPU spikes after many refreshes, check for orphan `curtain-card-session.sh` processes (should equal armed sessions). Modern loops exit on HUP when the window is killed.
+
 ## Troubleshooting "no cards / bottom status for grok"
 
 - `herald curtain doctor` — hooks must show wired.
