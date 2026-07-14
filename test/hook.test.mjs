@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  isWatchEnd,
+  isWatchStart,
   nextState,
   parseHookPayload,
   resetsElapsed,
@@ -14,6 +16,9 @@ const ev = (o) => ({
   hasTasks: false,
   subagents: 0,
   shells: 0,
+  toolName: "",
+  toolBackground: false,
+  loopPrompt: false,
   ...o,
 });
 
@@ -179,6 +184,60 @@ test("Stop with only background shells running does mean done", () => {
 
 test("Stop with nothing in flight means done", () => {
   assert.equal(nextState(STATES.WORKING, ev({ event: "Stop" })), STATES.DONE);
+});
+
+test("Stop with Grok watchers still in flight stays WORKING", () => {
+  assert.equal(
+    nextState(STATES.WORKING, ev({ event: "Stop" }), {
+      subagents: 0,
+      watchers: 1,
+    }),
+    STATES.WORKING,
+  );
+});
+
+test("idle_prompt with watchers stays WORKING", () => {
+  assert.equal(
+    nextState(
+      STATES.WORKING,
+      ev({ event: "Notification", notificationType: "idle_prompt" }),
+      { subagents: 0, watchers: 2 },
+    ),
+    STATES.WORKING,
+  );
+});
+
+test("isWatchStart detects /loop prompt and scheduler_create", () => {
+  assert.equal(isWatchStart(ev({ loopPrompt: true })), true);
+  assert.equal(
+    isWatchStart(ev({ toolName: "scheduler_create", event: "PostToolUse" })),
+    true,
+  );
+  assert.equal(
+    isWatchStart(
+      ev({
+        toolName: "run_terminal_command",
+        toolBackground: true,
+        event: "PostToolUse",
+      }),
+    ),
+    true,
+  );
+  assert.equal(isWatchStart(ev({ toolName: "Read" })), false);
+  assert.equal(isWatchEnd(ev({ toolName: "scheduler_delete" })), true);
+});
+
+test("parseHookPayload marks /loop UserPromptSubmit as loopPrompt", () => {
+  const p = parseHookPayload(
+    JSON.stringify({
+      hookEventName: "user_prompt_submit",
+      prompt: "/loop 5m check deploy",
+      promptId: "abc",
+    }),
+  );
+  assert.equal(p.event, "UserPromptSubmit");
+  assert.equal(p.loopPrompt, true);
+  assert.equal(p.synthetic, false);
 });
 
 test("SubagentStop never resurrects WORKING from a settled card", () => {

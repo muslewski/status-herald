@@ -774,6 +774,103 @@ test("applySettle does not settle Claude tasks_seen during pure generation", () 
   assert.equal(t.getSessOpt("s1", "@herald_state"), "working");
 });
 
+test("Grok /loop: Stop stays WORKING while watchers > 0", () => {
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  stampFromHook(
+    "%9",
+    {
+      event: "UserPromptSubmit",
+      loopPrompt: true,
+      synthetic: false,
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+      toolName: "",
+      toolBackground: false,
+    },
+    1000,
+    t,
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_bg_watchers"), "1");
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "working");
+  stampFromHook(
+    "%9",
+    {
+      event: "Stop",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+      toolName: "",
+      toolBackground: false,
+      loopPrompt: false,
+    },
+    1010,
+    t,
+  );
+  assert.equal(
+    t.getSessOpt("s1", "@herald_state"),
+    "working",
+    "must not DONE while /loop is watching",
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_bg_watchers"), "1");
+});
+
+test("scheduler_delete clears watcher so Stop can DONE", () => {
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  stampFromHook(
+    "%9",
+    {
+      event: "PostToolUse",
+      toolName: "scheduler_create",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+      toolBackground: false,
+      loopPrompt: false,
+    },
+    1000,
+    t,
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_bg_watchers"), "1");
+  stampFromHook(
+    "%9",
+    {
+      event: "PostToolUse",
+      toolName: "scheduler_delete",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+      toolBackground: false,
+      loopPrompt: false,
+    },
+    1010,
+    t,
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_bg_watchers"), "0");
+  stampFromHook(
+    "%9",
+    {
+      event: "Stop",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+      toolName: "",
+      toolBackground: false,
+      loopPrompt: false,
+    },
+    1020,
+    t,
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "done");
+});
+
 test("applyWash paints working colour when wash enabled", () => {
   const t = makeT(freshSession());
   t.setSessOpt("s1", "@herald_state", "working");

@@ -54,6 +54,24 @@ test("settleIfStale: synthesis quiet WORKING+subs0 → DONE", () => {
   );
 });
 
+test("settleIfStale: never settles while watchers (Grok loops) > 0", () => {
+  assert.equal(
+    settleIfStale(
+      {
+        state: "working",
+        subs: 0,
+        watchers: 1,
+        tasksSeen: false,
+        lastActive: 1000,
+        since: 900,
+      },
+      9999,
+      { settleSynthQuietSec: 90 },
+    ),
+    null,
+  );
+});
+
 test("settleIfStale: task_complete-hot last_hook would not matter — uses lastActive", () => {
   // Quiet only 10s on lastActive → no settle even if "hook spam"
   assert.equal(

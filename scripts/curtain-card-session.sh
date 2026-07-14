@@ -39,6 +39,7 @@ while :; do
   since=${O[@herald_since]:-0}
   subs=${O[@herald_bg_subagents]:-0}
   shells=${O[@herald_bg_shells]:-0}
+  watchers=${O[@herald_bg_watchers]:-0}
   worked=${O[@herald_worked]:-0}
   theme=${O[@herald_theme]:-classic}
   frame_ms=${O[@herald_frame_ms]:-1000}
@@ -61,6 +62,7 @@ while :; do
   herald render --surface curtain-card \
     --state "${state:-idle}" --since "${since:-0}" \
     --subagents "${subs:-0}" --shells "${shells:-0}" \
+    --watchers "${watchers:-0}" \
     --worked "${worked:-0}" \
     --theme "${theme:-classic}" --tick "$tick" \
     --cols "$cols" --rows "$rows" --color always 2>/dev/null || true
