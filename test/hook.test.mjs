@@ -133,6 +133,36 @@ test("synthetic UserPromptSubmit does not start work or reset the clock", () => 
   );
 });
 
+test("task-complete inject resumes WORKING so thinking is not stuck on DONE", () => {
+  assert.equal(
+    nextState(
+      STATES.DONE,
+      ev({
+        event: "UserPromptSubmit",
+        synthetic: true,
+        taskCompleteInject: true,
+      }),
+    ),
+    STATES.WORKING,
+  );
+});
+
+test("synthetic UPS with active watchers resumes WORKING", () => {
+  assert.equal(
+    nextState(STATES.DONE, ev({ event: "UserPromptSubmit", synthetic: true }), {
+      watchers: 1,
+    }),
+    STATES.WORKING,
+  );
+});
+
+test("PreToolUse marks WORKING (earlier than PostToolUse)", () => {
+  assert.equal(
+    nextState(STATES.DONE, ev({ event: "PreToolUse" })),
+    STATES.WORKING,
+  );
+});
+
 test("parseHookPayload marks Grok task-completed injects as synthetic", () => {
   const p = parseHookPayload(
     JSON.stringify({

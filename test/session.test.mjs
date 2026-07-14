@@ -611,7 +611,7 @@ test("Claude: last SubagentStop with hasTasks still holds WORKING until idle_pro
   assert.equal(t.getSessOpt("s1", "@herald_state"), "done");
 });
 
-test("synthetic UserPromptSubmit does not re-assert WORKING after DONE", () => {
+test("generic synthetic UPS does not re-assert WORKING after DONE", () => {
   const t = makeT(freshSession());
   t.sessionOf = () => "s1";
   stampFromHook(
@@ -622,6 +622,9 @@ test("synthetic UserPromptSubmit does not re-assert WORKING after DONE", () => {
       subagents: 0,
       shells: 0,
       subagentIds: [],
+      toolName: "",
+      toolBackground: false,
+      loopPrompt: false,
     },
     1000,
     t,
@@ -632,10 +635,14 @@ test("synthetic UserPromptSubmit does not re-assert WORKING after DONE", () => {
     {
       event: "UserPromptSubmit",
       synthetic: true,
+      taskCompleteInject: false,
       hasTasks: false,
       subagents: 0,
       shells: 0,
       subagentIds: [],
+      toolName: "",
+      toolBackground: false,
+      loopPrompt: false,
     },
     1001,
     t,
@@ -643,9 +650,46 @@ test("synthetic UserPromptSubmit does not re-assert WORKING after DONE", () => {
   assert.equal(
     t.getSessOpt("s1", "@herald_state"),
     "done",
-    "task-completed inject must not pull DONE back to WORKING",
+    "non-resume synthetic noise must not pull DONE → WORKING",
   );
-  assert.equal(t.getSessOpt("s1", "@herald_last_hook"), "1001");
+});
+
+test("task-complete inject after DONE marks WORKING (Grok thinking resume)", () => {
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  stampFromHook(
+    "%9",
+    {
+      event: "Stop",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+      toolName: "",
+      toolBackground: false,
+      loopPrompt: false,
+    },
+    1000,
+    t,
+  );
+  stampFromHook(
+    "%9",
+    {
+      event: "UserPromptSubmit",
+      synthetic: true,
+      taskCompleteInject: true,
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+      toolName: "",
+      toolBackground: false,
+      loopPrompt: false,
+    },
+    1001,
+    t,
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "working");
 });
 
 test("permission_prompt still wins over synthesis-only SubagentStop drain", () => {
