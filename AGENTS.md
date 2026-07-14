@@ -111,6 +111,9 @@ Re-arm sessions after upgrade for sub counts: `herald curtain disarm && herald c
 - Grok config may suppress some notifs — ensure `ui.notifications.events` includes approval if you want NEEDS cards.
 - Payload shape: recent Grok uses `hookEventName`; herald handles both + env `GROK_HOOK_EVENT`.
 - If sub count always 0 on Grok: expected (synthesized); Stop will still mark DONE unless a SubagentStart has been seen for that session since arm.
+- **Grok has no `idle_prompt`.** Claude holds WORKING after the last SubagentStop until idle (~60s). Grok (synthesis-only, never saw `background_tasks`) settles to DONE on the last SubagentStop when the id set drains. Claude task-list sessions still wait for idle.
+- **Synthetic UserPromptSubmit** (`promptId: task-completed-*` or `<system-reminder>` task-complete injects) does **not** re-assert WORKING after DONE.
+- Stuck WORKING with leftover `syn-*` ids: SubagentStart without matching SubagentStop; next human prompt clears the set, or `herald curtain disarm && arm` on that session.
 
 ## Config
 
