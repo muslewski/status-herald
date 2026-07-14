@@ -11,6 +11,7 @@ import {
   refreshCards,
   reveal,
   revealAll,
+  shouldSettleSynthSubagentStop,
   stampFromHook,
   stampSession,
 } from "../lib/curtain/session.mjs";
@@ -511,6 +512,201 @@ test("id-set: Grok Stop without tasks keeps WORKING while subagent ids remain", 
   );
   assert.equal(t.getSessOpt("s1", "@herald_state"), "working");
   assert.equal(t.getSessOpt("s1", "@herald_bg_subagents"), "1");
+});
+
+test("Grok: last SubagentStop with zero synth ids settles to DONE (no idle_prompt)", () => {
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  const start = (id) => ({
+    event: "SubagentStart",
+    agentId: id,
+    hasTasks: false,
+    subagents: 0,
+    shells: 0,
+    subagentIds: [],
+  });
+  const stopSub = (id) => ({
+    event: "SubagentStop",
+    agentId: id,
+    hasTasks: false,
+    subagents: 0,
+    shells: 0,
+    subagentIds: [],
+  });
+  stampFromHook("%9", start("g1"), 1000, t);
+  stampFromHook(
+    "%9",
+    {
+      event: "Stop",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+    },
+    2000,
+    t,
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "working");
+  assert.equal(t.getSessOpt("s1", "@herald_bg_subagents"), "1");
+  stampFromHook("%9", stopSub("g1"), 3000, t);
+  assert.equal(t.getSessOpt("s1", "@herald_bg_subagents"), "0");
+  assert.equal(
+    t.getSessOpt("s1", "@herald_state"),
+    "done",
+    "synthesis-only host must not wait forever for idle_prompt",
+  );
+});
+
+test("Claude: last SubagentStop with hasTasks still holds WORKING until idle_prompt", () => {
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  stampFromHook(
+    "%9",
+    {
+      event: "Stop",
+      hasTasks: true,
+      subagents: 1,
+      shells: 0,
+      subagentIds: ["a1"],
+    },
+    1000,
+    t,
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "working");
+  assert.equal(t.getSessOpt("s1", "@herald_tasks_seen"), "1");
+  stampFromHook(
+    "%9",
+    {
+      event: "SubagentStop",
+      agentId: "a1",
+      hasTasks: true,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+    },
+    1100,
+    t,
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_bg_subagents"), "0");
+  assert.equal(
+    t.getSessOpt("s1", "@herald_state"),
+    "working",
+    "must NOT settle early on Claude",
+  );
+  stampFromHook(
+    "%9",
+    {
+      event: "Notification",
+      notificationType: "idle_prompt",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+    },
+    1160,
+    t,
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "done");
+});
+
+test("synthetic UserPromptSubmit does not re-assert WORKING after DONE", () => {
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  stampFromHook(
+    "%9",
+    {
+      event: "Stop",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+    },
+    1000,
+    t,
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "done");
+  stampFromHook(
+    "%9",
+    {
+      event: "UserPromptSubmit",
+      synthetic: true,
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+    },
+    1001,
+    t,
+  );
+  assert.equal(
+    t.getSessOpt("s1", "@herald_state"),
+    "done",
+    "task-completed inject must not pull DONE back to WORKING",
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_last_hook"), "1001");
+});
+
+test("permission_prompt still wins over synthesis-only SubagentStop drain", () => {
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  stampFromHook(
+    "%9",
+    {
+      event: "Notification",
+      notificationType: "permission_prompt",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+    },
+    1000,
+    t,
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "needs");
+  stampFromHook(
+    "%9",
+    {
+      event: "SubagentStop",
+      agentId: "x",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+    },
+    1001,
+    t,
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "needs");
+});
+
+test("arm clears tasks_seen so a re-armed session can reclassify host", () => {
+  const t = makeT(freshSession());
+  t.setSessOpt("s1", "@herald_tasks_seen", "1");
+  // arm is no-op if already armed; force unarmed
+  t.setSessOpt("s1", "@herald_armed", "0");
+  arm("s1", t);
+  assert.equal(t.getSessOpt("s1", "@herald_tasks_seen"), "0");
+});
+
+test("shouldSettleSynthSubagentStop pure helper", () => {
+  assert.equal(
+    shouldSettleSynthSubagentStop({
+      tasksSeen: false,
+      event: "SubagentStop",
+      subs: 0,
+      cur: "working",
+    }),
+    true,
+  );
+  assert.equal(
+    shouldSettleSynthSubagentStop({
+      tasksSeen: true,
+      event: "SubagentStop",
+      subs: 0,
+      cur: "working",
+    }),
+    false,
+  );
 });
 
 test("stampFromHook writes a heartbeat on every event", () => {

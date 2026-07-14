@@ -117,6 +117,40 @@ test("a user prompt starts work and restarts the clock", () => {
   assert.equal(resetsElapsed(ev({ event: "Stop" })), false);
 });
 
+test("synthetic UserPromptSubmit does not start work or reset the clock", () => {
+  assert.equal(
+    nextState(STATES.DONE, ev({ event: "UserPromptSubmit", synthetic: true })),
+    STATES.DONE,
+  );
+  assert.equal(
+    resetsElapsed(ev({ event: "UserPromptSubmit", synthetic: true })),
+    false,
+  );
+});
+
+test("parseHookPayload marks Grok task-completed injects as synthetic", () => {
+  const p = parseHookPayload(
+    JSON.stringify({
+      hookEventName: "user_prompt_submit",
+      promptId: "task-completed-abc",
+      prompt: "<system-reminder>\nBackground task call-1 completed\n",
+    }),
+  );
+  assert.equal(p.event, "UserPromptSubmit");
+  assert.equal(p.synthetic, true);
+});
+
+test("parseHookPayload human prompt is not synthetic", () => {
+  const p = parseHookPayload(
+    JSON.stringify({
+      hookEventName: "user_prompt_submit",
+      promptId: "d4c6de0c-8522-4937-a76e-5dd2284617c0",
+      prompt: "please fix the curtain",
+    }),
+  );
+  assert.equal(p.synthetic, false);
+});
+
 test("dispatching a subagent keeps the session working", () => {
   assert.equal(
     nextState(STATES.DONE, ev({ event: "SubagentStart" })),
@@ -368,7 +402,10 @@ test("interop golden compact sequence: never DONE while compacting", () => {
   assert.equal(s, STATES.COMPACTING);
   assert.notEqual(s, STATES.DONE);
   // Drain via idle_prompt (primary end-marker after compact) or Stop.
-  s = nextState(s, ev({ event: "Notification", notificationType: "idle_prompt" }));
+  s = nextState(
+    s,
+    ev({ event: "Notification", notificationType: "idle_prompt" }),
+  );
   assert.equal(s, STATES.DONE);
   // Or: compact → PostToolUse resumes working (block cleared / turn continues).
   assert.equal(
