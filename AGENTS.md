@@ -113,7 +113,8 @@ Re-arm sessions after upgrade for sub counts: `herald curtain disarm && herald c
 - If sub count always 0 on Grok: expected (synthesized); Stop will still mark DONE unless a SubagentStart has been seen for that session since arm.
 - **Grok has no `idle_prompt`.** Claude holds WORKING after the last SubagentStop until idle (~60s). Grok (synthesis-only, never saw `background_tasks`) settles to DONE on the last SubagentStop when the id set drains. Claude task-list sessions still wait for idle.
 - **Synthetic UserPromptSubmit** (`promptId: task-completed-*` or `<system-reminder>` task-complete injects) does **not** re-assert WORKING after DONE.
-- Stuck WORKING with leftover `syn-*` ids: SubagentStart without matching SubagentStop; next human prompt clears the set, or `herald curtain disarm && arm` on that session.
+- **Quiet/leak settle (defense-in-depth):** card loop runs `herald curtain settle` each tick. Synthesis hosts quiet → DONE after `curtain.settle.settleSynthQuietSec` (90s) with no *active* hooks (`@herald_last_active`; `task_complete` does not count). Leaked `syn-*` ids clear after `settleSynthLeakSec` (180s). Claude (`@herald_tasks_seen=1`) is **not** quiet-settled. Optional `maxWorkingSec` / `maxNeedsSec` (default 0 = off).
+- Stuck WORKING with leftover `syn-*` ids: SubagentStop with a mismatched id now drops a `syn-*`; otherwise wait for leak settle, next human prompt, or `disarm && arm`.
 
 ## Config
 

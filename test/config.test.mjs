@@ -107,6 +107,14 @@ test("curtain.tmuxBar defaults to keep (no bar change)", () => {
   assert.equal(DEFAULTS.curtain.tmuxBar.whenCovered, "keep");
 });
 
+test("curtain.settle defaults are fleet-safe quiet/leak windows", () => {
+  const s = DEFAULTS.curtain.settle;
+  assert.equal(s.settleSynthQuietSec, 90);
+  assert.equal(s.settleSynthLeakSec, 180);
+  assert.equal(s.maxWorkingSec, 0);
+  assert.equal(s.maxNeedsSec, 0);
+});
+
 test("a user can override tmuxBar.whenCovered to transparent", () => {
   const cfg = merge(DEFAULTS, {
     curtain: { tmuxBar: { whenCovered: "transparent" } },

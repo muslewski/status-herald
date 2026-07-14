@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   TITLE_FMT,
+  applySettle,
   arm,
   armAll,
   armIfMatch,
@@ -707,6 +708,106 @@ test("shouldSettleSynthSubagentStop pure helper", () => {
     }),
     false,
   );
+});
+
+test("SubagentStop with mismatched id drops a syn-* id (Grok pairing)", () => {
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  stampFromHook(
+    "%9",
+    {
+      event: "SubagentStart",
+      agentId: "",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+    },
+    1000,
+    t,
+  );
+  const ids = t.getSessOpt("s1", "@herald_bg_subagent_ids");
+  assert.match(ids, /^syn-/);
+  stampFromHook(
+    "%9",
+    {
+      event: "SubagentStop",
+      agentId: "real-g1",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+    },
+    1001,
+    t,
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_bg_subagents"), "0");
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "done");
+});
+
+test("applySettle quiet-settles synthesis WORKING after quiet window", () => {
+  const t = makeT(freshSession());
+  t.setSessOpt("s1", "@herald_state", "working");
+  t.setSessOpt("s1", "@herald_bg_subagents", "0");
+  t.setSessOpt("s1", "@herald_tasks_seen", "0");
+  t.setSessOpt("s1", "@herald_last_active", "1000");
+  t.setSessOpt("s1", "@herald_since", "900");
+  const ok = applySettle("s1", 1000 + 90, t, {
+    settle: { settleSynthQuietSec: 90 },
+  });
+  assert.equal(ok, true);
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "done");
+});
+
+test("applySettle does not settle Claude tasks_seen during pure generation", () => {
+  const t = makeT(freshSession());
+  t.setSessOpt("s1", "@herald_state", "working");
+  t.setSessOpt("s1", "@herald_bg_subagents", "0");
+  t.setSessOpt("s1", "@herald_tasks_seen", "1");
+  t.setSessOpt("s1", "@herald_last_active", "1000");
+  t.setSessOpt("s1", "@herald_since", "900");
+  const ok = applySettle("s1", 1000 + 999, t, {
+    settle: { settleSynthQuietSec: 90, maxWorkingSec: 0 },
+  });
+  assert.equal(ok, false);
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "working");
+});
+
+test("stampFromHook sets last_active on Stop but not on task_complete", () => {
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  stampFromHook(
+    "%9",
+    {
+      event: "Stop",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+    },
+    50,
+    t,
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_last_active"), "50");
+  stampFromHook(
+    "%9",
+    {
+      event: "Notification",
+      notificationType: "task_complete",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+    },
+    60,
+    t,
+  );
+  assert.equal(
+    t.getSessOpt("s1", "@herald_last_active"),
+    "50",
+    "informational ping must not refresh last_active",
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_last_hook"), "60");
 });
 
 test("stampFromHook writes a heartbeat on every event", () => {
