@@ -26,6 +26,8 @@ HERALD is the status layer for agent terminals — glanceable cards and bars so 
 - Polish **curtain animations**; treat UX as primary (“eyes are the judge”).
 - Presets / configuration flexibility for open source (thousands of GitHub stars ambition).
 - Lightweight for: Manjaro local tmux, MacBook mosh over Tailscale, occasional commercial VPN.
+- **Geometry stability:** cards/bars must not look broken when the terminal is resized, repositioned, or when client width/height changes (common on MacBook + mosh + tiling).
+- **Motion control:** proper config knobs so users can disable or reduce motion (accessibility, VPN, preference) without losing state glyphs.
 
 ### Current state (verified at design time)
 
@@ -291,6 +293,65 @@ Deferred: dirty-row paint, fifo-wake on cover, cross-state morph.
 
 Hard cap via `animation.maxFps` (optional) and profile clamps.
 
+### Geometry stability (resize / reposition / multi-client)
+
+**Problem (operator report):** UI “shifts” or ghosts when terminal **width/height** changes, window is **repositioned**, or a client attaches with a different size (mosh tab resize, tiling WM, split panes). Premium TUIs treat geometry change as a first-class event, not a random frame.
+
+**Root causes to address (existing + Phase 1):**
+
+| Cause | Mitigation |
+|-------|------------|
+| Stale geometry in paint | Re-read `cols`/`rows` **every tick** (already via `tput`); never cache for the life of the process without invalidation |
+| Shrink leaves ghost rows/cols | Keep per-line `eraseLine` + trailing `eraseBelow` (already); on geometry **change**, force a full repaint path (do **not** skip-identical) |
+| Grow leaves transparent right/bottom garbage | On geometry change, solid themes re-fill full width; transparent themes erase line to end + erase below |
+| Layout reflow on value change | **Reserved-width** fields for timer (`m:ss` zero-padded / fixed slots) and subagent counts so neighbors do not jump |
+| Art wider than pane | Clip/center by `visibleWidth`; wrap off during paint (already); if frame ink > cols, trim or fall back to glyph+label |
+| Bar width thrash | Priority width-drop with stable order; Phase 3 `min(client_width)`; never reflow mid-string without reserved fields |
+| Position-only move (same cols×rows) | No special work — paint is absolute CSI home; position is the terminal emulator’s job |
+| Multi-client different sizes | Each client paints its own pane size; bar uses narrowest client when cutover lands |
+
+**Phase 1 requirements:**
+
+1. Card loop tracks `prev_cols`/`prev_rows`; if either changes → set `geometry_dirty=1`, **disable** skip-identical for that frame, repaint full grid.
+2. Renderer contract stays pure: caller passes current cols/rows; no hidden global size.
+3. Document that **animation off** still re-centers on resize (static card must stay correct).
+4. Tests: `renderCard` at 40×12 vs 120×40 produces full `rows` lines each; narrow cols do not throw; timer pad does not change adjacent layout when seconds roll (where we add reserved width).
+
+**Not required Phase 1:** SIGWINCH interrupt of `read -t` for instant resize (nice-to-have; next tick ≤1s is acceptable). Phase 2 runtime may handle SIGWINCH.
+
+### Motion disable & reduced motion (config contract)
+
+Users must be able to turn motion off without losing WORKING/DONE/NEEDS meaning.
+
+```json
+"curtain": {
+  "animation": {
+    "enabled": true,
+    "fps": 2,
+    "profile": "local",
+    "reducedMotion": false,
+    "maxFps": 4
+  }
+},
+"bars": {
+  "tmux": {
+    "background": { "animated": false, "doneFlashSec": 3 }
+  }
+}
+```
+
+| Knob | Effect |
+|------|--------|
+| `curtain.animation.enabled: false` | Cards use **first frame or glyph only** (no tick cycle); `@herald_frame_ms` = 1000; bar wash forced off regardless of pack |
+| `curtain.animation.reducedMotion: true` | Same as enabled false for motion sampling; still allows state color/glyph changes |
+| `curtain.animation.profile: "minimal"` | Soft prefer: 1 Hz, wash preference off in look packs |
+| `bars.tmux.background.animated: false` | No bar wash (default — classic-safe) |
+| Explicit `fps: 0` or invalid | Treat as static (1 Hz, no multi-frame cycle) |
+
+**Precedence:** `enabled: false` OR `reducedMotion: true` → no card multi-frame cycle, no bar wash. Else profile clamps fps. Else explicit `fps`. Else default 2.
+
+Look packs may set wash/profile; **user `enabled: false` always wins last** (user overlay last remains the rule).
+
 ---
 
 ## Config: profiles, look packs, themes
@@ -300,8 +361,10 @@ Hard cap via `animation.maxFps` (optional) and profile clamps.
 ```json
 "curtain": {
   "animation": {
+    "enabled": true,
     "fps": 2,
-    "profile": "local"
+    "profile": "local",
+    "reducedMotion": false
   }
 }
 ```
@@ -312,7 +375,7 @@ Hard cap via `animation.maxFps` (optional) and profile clamps.
 | `remote` | Mosh fleet | Cap ≤ 1 Hz covered; keep frames but slow |
 | `minimal` | Quiet / battery | Static cadence; wash off preference |
 
-**Explicit `fps` always wins** over profile-derived rates when set.
+**Explicit `fps` always wins** over profile-derived rates when set (unless motion disabled).
 
 ### Look packs (visual overlays — not 006 content presets)
 
@@ -457,6 +520,8 @@ Focus path remains optional for day-1 grid; multi-tab mosh remains Advanced.
 - [ ] `herald curtain demo` shows the language without hooks/tmux arm.
 - [ ] No look pack / classic path: **unchanged** default behavior (golden classic green).
 - [ ] status-style cover transparent **composes** with wash without stranding.
+- [ ] **Geometry dirty:** cols/rows change forces full card repaint (skip-identical bypassed); no throw on narrow sizes.
+- [ ] **`animation.enabled: false` / `reducedMotion: true`:** static frames, no bar wash, state glyphs still correct.
 - [ ] `node --test` green; biome clean on touched files.
 - [ ] **No** live fleet `status-right` rewrite in Phase 1 executors.
 
