@@ -994,14 +994,17 @@ test("scheduler_delete clears watcher so Stop can DONE", () => {
   assert.equal(t.getSessOpt("s1", "@herald_state"), "done");
 });
 
-test("applyWash paints working colour when wash enabled", () => {
+test("applyWash uses transparent bg + sliding line when working", () => {
   const t = makeT(freshSession());
   t.setSessOpt("s1", "@herald_state", "working");
   t.setSessOpt("s1", "@herald_since", "1000");
   applyWash("s1", 1004, t, {
     tmuxBar: { wash: true, doneFlashSec: 3, whenCovered: "keep" },
   });
-  assert.match(t.getSessOpt("s1", "status-style"), /bg=colour/);
+  assert.match(t.getSessOpt("s1", "status-style"), /bg=default/);
+  assert.doesNotMatch(t.getSessOpt("s1", "status-style"), /bg=colour\d+/);
+  assert.match(t.getSessOpt("s1", "@herald_bar_line"), /━/);
+  assert.match(t.getSessOpt("s1", "status-left"), /@herald_bar_line/);
 });
 
 test("applyWash is no-op when wash disabled", () => {
@@ -1009,6 +1012,7 @@ test("applyWash is no-op when wash disabled", () => {
   t.setSessOpt("s1", "@herald_state", "working");
   applyWash("s1", 1000, t, { tmuxBar: { wash: false } });
   assert.equal(t.getSessOpt("s1", "status-style"), "");
+  assert.equal(t.getSessOpt("s1", "@herald_bar_line"), "");
 });
 
 test("stampFromHook sets last_active on Stop but not on task_complete", () => {
