@@ -103,9 +103,9 @@ test("loadConfig honors a hammerspoon focus source override", () => {
   }
 });
 
-test("curtain.tmuxBar defaults to keep + wash on", () => {
+test("curtain.tmuxBar defaults to keep + wash off (context first)", () => {
   assert.equal(DEFAULTS.curtain.tmuxBar.whenCovered, "keep");
-  assert.equal(DEFAULTS.curtain.tmuxBar.wash, true);
+  assert.equal(DEFAULTS.curtain.tmuxBar.wash, false);
   assert.equal(DEFAULTS.curtain.tmuxBar.doneFlashSec, 3);
 });
 

@@ -58,12 +58,14 @@ test("countMessages counts human messages, resets on compact_boundary", async ()
   assert.equal(countMessages(lines), 1);
 });
 
-test("modelWindow 1M for opus-4 / sonnet-4 / 1m markers else 200k", () => {
+test("modelWindow 1M for opus-4 / sonnet-4 / 1m markers else 200k; Grok is 500k", () => {
   assert.equal(modelWindow("claude-opus-4-8"), 1_000_000);
   assert.equal(modelWindow("claude-sonnet-4-5"), 1_000_000);
   assert.equal(modelWindow("something-1m"), 1_000_000);
   assert.equal(modelWindow("claude-3-haiku"), 200_000);
   assert.equal(modelWindow(null), 200_000);
+  assert.equal(modelWindow("grok-4"), 500_000);
+  assert.equal(modelWindow("xai/grok-code"), 500_000);
 });
 
 test("computeContext returns used/win/pct/messages from transcript", async () => {
