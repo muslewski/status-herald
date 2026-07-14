@@ -234,37 +234,24 @@ test("forge working art keeps the head centered over the anvil", () => {
   );
 });
 
-test("forge DONE settled frame keeps checkmark centered on the anvil", () => {
-  // Regression: trailing spaces in "   ✓   " were stripped so ✓ sat left of =======.
+test("forge DONE settled frame is multi-row ASCII check on anvil", () => {
   const cols = 40;
   const lines = renderCard(
     "done",
     0,
     cols,
-    12,
+    14,
     { worked: 99 },
     BUILTINS.forge,
     99,
   ).map(plain);
-  const inkCenter = (l) => {
-    const lead = l.length - l.trimStart().length;
-    const t = l.replace(/\s+$/, "");
-    return (lead + t.length) / 2;
-  };
+  const joined = lines.join("\n");
+  assert.match(joined, /=======/);
+  assert.match(joined, /V/);
+  assert.doesNotMatch(joined, /[✅✓]/);
   const anvil = lines.find((l) => /=======/.test(l));
-  const check = lines.find((l) => l.includes("✓"));
-  assert.ok(anvil && check, "expected anvil + checkmark rows");
-  assert.ok(
-    Math.abs(inkCenter(check) - inkCenter(anvil)) <= 1,
-    `check center ${inkCenter(check)} vs anvil ${inkCenter(anvil)}`,
-  );
-  // Label axis should match art block center (within 1 col).
-  const label = lines.find((l) => /^\s*DONE\s*$/.test(l));
-  assert.ok(label, "DONE label present");
-  assert.ok(
-    Math.abs(inkCenter(label) - inkCenter(anvil)) <= 1,
-    `DONE center ${inkCenter(label)} vs anvil ${inkCenter(anvil)}`,
-  );
+  const check = lines.find((l) => /V/.test(l));
+  assert.ok(anvil && check, "expected anvil + ASCII check rows");
 });
 
 // Plan 014 contract: theme owns art; herald still owns dynamic info under frames.
@@ -351,17 +338,19 @@ test("settleAfter freezes an animated state on its last frame", () => {
   assert.match(at(50), /CCC/, "stays frozen");
 });
 
-test("forge DONE animates sparks then settles on the clean piece", () => {
-  const sparks = renderCard("done", 0, 24, 8, {}, BUILTINS.forge, 0)
+test("forge DONE animates sparks then settles on large ASCII check", () => {
+  const sparks = renderCard("done", 0, 24, 14, {}, BUILTINS.forge, 0)
     .map(plain)
     .join("\n");
-  assert.match(sparks, /\* ✓ \*/, "tick 0 shows sparks over the anvil");
+  assert.match(sparks, /\* \. \*/, "tick 0 shows sparks over the billet");
   assert.match(sparks, /=======/, "keeps the anvil");
-  const settled = renderCard("done", 0, 24, 8, {}, BUILTINS.forge, 99)
+  assert.match(sparks, /\|###\|/, "working-scale billet");
+  const settled = renderCard("done", 0, 24, 14, {}, BUILTINS.forge, 99)
     .map(plain)
     .join("\n");
   assert.doesNotMatch(settled, /\*/, "settled frame has no sparks");
-  assert.match(settled, /✓/);
+  assert.match(settled, /V/, "ASCII check, not emoji");
+  assert.doesNotMatch(settled, /[✅✓]/);
 });
 
 test("forge COMPACTING squeezes inward and loops (no settle)", () => {

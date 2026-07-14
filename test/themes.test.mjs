@@ -68,9 +68,23 @@ test("forge is a transparent, animated theme", () => {
 
 test("forge done and compacting are animated with a settle on done", () => {
   assert.ok(BUILTINS.forge.states.done.frames.length >= 2);
-  assert.equal(BUILTINS.forge.states.done.settleAfter, 6);
+  assert.equal(BUILTINS.forge.states.done.settleAfter, 10);
   assert.ok(BUILTINS.forge.states.compacting.frames.length >= 2);
   assert.equal(BUILTINS.forge.states.compacting.settleAfter, undefined);
+});
+
+test("forge done art is multi-row ASCII (same scale as working), not a lone emoji", () => {
+  const frames = BUILTINS.forge.states.done.frames;
+  assert.ok(frames.length >= 4, "settle sequence with room to breathe");
+  for (const fr of frames) {
+    assert.ok(fr.length >= 4, "at least 4 art rows per frame");
+    const joined = fr.join("\n");
+    assert.doesNotMatch(joined, /[✅✓]/, "no thin emoji checkmark");
+    assert.match(joined, /=======/, "anvil base retained");
+  }
+  // Settled last frame is a large ASCII check on the anvil.
+  const last = frames[frames.length - 1].join("\n");
+  assert.match(last, /V|\\\\/, "ASCII check form present");
 });
 
 test("minimal gains animated done/compacting but keeps working static", () => {

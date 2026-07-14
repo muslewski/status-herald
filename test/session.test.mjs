@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   TITLE_FMT,
   applySettle,
+  applyWash,
   arm,
   armAll,
   armIfMatch,
@@ -771,6 +772,23 @@ test("applySettle does not settle Claude tasks_seen during pure generation", () 
   });
   assert.equal(ok, false);
   assert.equal(t.getSessOpt("s1", "@herald_state"), "working");
+});
+
+test("applyWash paints working colour when wash enabled", () => {
+  const t = makeT(freshSession());
+  t.setSessOpt("s1", "@herald_state", "working");
+  t.setSessOpt("s1", "@herald_since", "1000");
+  applyWash("s1", 1004, t, {
+    tmuxBar: { wash: true, doneFlashSec: 3, whenCovered: "keep" },
+  });
+  assert.match(t.getSessOpt("s1", "status-style"), /bg=colour/);
+});
+
+test("applyWash is no-op when wash disabled", () => {
+  const t = makeT(freshSession());
+  t.setSessOpt("s1", "@herald_state", "working");
+  applyWash("s1", 1000, t, { tmuxBar: { wash: false } });
+  assert.equal(t.getSessOpt("s1", "status-style"), "");
 });
 
 test("stampFromHook sets last_active on Stop but not on task_complete", () => {

@@ -54,6 +54,8 @@ while :; do
   # Defense-in-depth: unstick WORKING/COMPACTING when hooks go quiet (Grok
   # synthesis hosts). Fail-open; no-op when settle policy has nothing to do.
   herald curtain settle >/dev/null 2>&1 || true
+  # Bottom bar wash (working flow / done settle / needs pulse) from @herald_state.
+  herald curtain wash >/dev/null 2>&1 || true
   cols=$(tput cols 2>/dev/null || echo 80)
   rows=$(tput lines 2>/dev/null || echo 24)
   herald render --surface curtain-card \

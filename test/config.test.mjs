@@ -103,8 +103,10 @@ test("loadConfig honors a hammerspoon focus source override", () => {
   }
 });
 
-test("curtain.tmuxBar defaults to keep (no bar change)", () => {
+test("curtain.tmuxBar defaults to keep + wash on", () => {
   assert.equal(DEFAULTS.curtain.tmuxBar.whenCovered, "keep");
+  assert.equal(DEFAULTS.curtain.tmuxBar.wash, true);
+  assert.equal(DEFAULTS.curtain.tmuxBar.doneFlashSec, 3);
 });
 
 test("curtain.settle defaults are fleet-safe quiet/leak windows", () => {
