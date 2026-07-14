@@ -818,6 +818,85 @@ test("Grok /loop: Stop stays WORKING while watchers > 0", () => {
   assert.equal(t.getSessOpt("s1", "@herald_bg_watchers"), "1");
 });
 
+test("/loop prompt + scheduler_create is ONE watcher not two", () => {
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  const base = {
+    hasTasks: false,
+    subagents: 0,
+    shells: 0,
+    subagentIds: [],
+    toolBackground: false,
+  };
+  stampFromHook(
+    "%9",
+    {
+      event: "UserPromptSubmit",
+      loopPrompt: true,
+      synthetic: false,
+      toolName: "",
+      ...base,
+    },
+    1000,
+    t,
+  );
+  stampFromHook(
+    "%9",
+    {
+      event: "PostToolUse",
+      toolName: "scheduler_create",
+      loopPrompt: false,
+      ...base,
+    },
+    1001,
+    t,
+  );
+  assert.equal(
+    t.getSessOpt("s1", "@herald_bg_watchers"),
+    "1",
+    "must not double-count /loop + create",
+  );
+  assert.match(t.getSessOpt("s1", "@herald_bg_watcher_ids"), /\bloop\b/);
+  assert.doesNotMatch(t.getSessOpt("s1", "@herald_bg_watcher_ids"), /pending/);
+});
+
+test("bg shell is a task not a second watcher", () => {
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  stampFromHook(
+    "%9",
+    {
+      event: "PostToolUse",
+      toolName: "scheduler_create",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+      toolBackground: false,
+      loopPrompt: false,
+    },
+    1000,
+    t,
+  );
+  stampFromHook(
+    "%9",
+    {
+      event: "PostToolUse",
+      toolName: "run_terminal_command",
+      toolBackground: true,
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+      loopPrompt: false,
+    },
+    1001,
+    t,
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_bg_watchers"), "1");
+  assert.equal(t.getSessOpt("s1", "@herald_bg_shells"), "1");
+});
+
 test("scheduler_delete clears watcher so Stop can DONE", () => {
   const t = makeT(freshSession());
   t.sessionOf = () => "s1";

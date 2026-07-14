@@ -44,11 +44,11 @@ test("done card reports background shells you can safely leave running", () => {
     .map(plain)
     .join("\n");
   assert.match(one, /DONE/);
-  assert.match(one, /focus to open · 1 shell in bg/);
+  assert.match(one, /focus to open · 1 task in bg/);
   const many = renderCard("done", 0, 60, 10, { shells: 2 })
     .map(plain)
     .join("\n");
-  assert.match(many, /focus to open · 2 shells in bg/);
+  assert.match(many, /focus to open · 2 tasks in bg/);
 });
 
 test("a working card with no subagents keeps the bare elapsed clock", () => {
@@ -58,9 +58,9 @@ test("a working card with no subagents keeps the bare elapsed clock", () => {
   assert.doesNotMatch(text, /subagent/);
 });
 
-test("subagents never leak onto the DONE card, nor shells onto WORKING", () => {
-  // Stop with subagents in flight is never DONE, and a shell never blocks you,
-  // so each count belongs to exactly one card.
+test("subagents never leak onto the DONE card; tasks show on WORKING", () => {
+  // Stop with subagents in flight is never DONE; bg tasks may still show on
+  // WORKING as "N task" (Grok bg shells) without being called "loops".
   const done = renderCard("done", 0, 60, 10, { subagents: 3 })
     .map(plain)
     .join("\n");
@@ -68,7 +68,8 @@ test("subagents never leak onto the DONE card, nor shells onto WORKING", () => {
   const working = renderCard("working", 5, 60, 10, { shells: 2 })
     .map(plain)
     .join("\n");
-  assert.doesNotMatch(working, /shell/);
+  assert.match(working, /2 tasks/);
+  assert.doesNotMatch(working, /loop|watcher/);
 });
 
 test("compacting card announces the compaction instead of looking done", () => {
@@ -97,7 +98,7 @@ test("done card stacks the worked clock above the shells hint", () => {
     .map(plain)
     .join("\n");
   assert.match(text, /worked 1:30/);
-  assert.match(text, /2 shells in bg/);
+  assert.match(text, /2 tasks in bg/);
 });
 
 test("unknown state falls back to idle without throwing", () => {
