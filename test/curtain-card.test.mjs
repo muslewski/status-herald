@@ -48,11 +48,11 @@ test("done card reports background shells you can safely leave running", () => {
     .map(plain)
     .join("\n");
   assert.match(one, /DONE/);
-  assert.match(one, /focus to open · 1 task in bg/);
+  assert.match(one, /focus to open · 1 shell in bg/);
   const many = renderCard("done", 0, 60, 10, { shells: 2 })
     .map(plain)
     .join("\n");
-  assert.match(many, /focus to open · 2 tasks in bg/);
+  assert.match(many, /focus to open · 2 shells in bg/);
 });
 
 test("a working card with no subagents keeps the bare elapsed clock", () => {
@@ -62,7 +62,7 @@ test("a working card with no subagents keeps the bare elapsed clock", () => {
   assert.doesNotMatch(text, /subagent/);
 });
 
-test("done tail lists parked subagents before tasks and watchers", () => {
+test("done tail lists parked subagents before shells and monitors", () => {
   const lines = infoLines("done", {
     worked: 297,
     subagents: 2,
@@ -71,16 +71,16 @@ test("done tail lists parked subagents before tasks and watchers", () => {
   });
   const tail = lines.find((l) => l.includes("in bg"));
   assert.ok(tail, "expected a bg inventory line");
-  assert.match(tail, /2 subagents in bg · 3 tasks in bg · 1 watcher in bg/);
+  assert.match(tail, /2 subagents in bg · 3 shells in bg · 1 monitor in bg/);
 });
 
-test("tasks show on WORKING without being called loops", () => {
-  // Bg tasks may show on WORKING as "N task" (Grok bg shells).
+test("shells show on WORKING without being called loops or tasks", () => {
+  // Bg shells show on WORKING as "N shell" (Claude/Grok background shells).
   const working = renderCard("working", 5, 60, 10, { shells: 2 })
     .map(plain)
     .join("\n");
-  assert.match(working, /2 tasks/);
-  assert.doesNotMatch(working, /loop|watcher/);
+  assert.match(working, /2 shells/);
+  assert.doesNotMatch(working, /loop|watcher|\btasks?\b/);
 });
 
 test("compacting card announces the compaction instead of looking done", () => {
@@ -109,7 +109,7 @@ test("done card stacks the worked clock above the shells hint", () => {
     .map(plain)
     .join("\n");
   assert.match(text, /worked 1:30/);
-  assert.match(text, /2 tasks in bg/);
+  assert.match(text, /2 shells in bg/);
 });
 
 test("unknown state falls back to idle without throwing", () => {
