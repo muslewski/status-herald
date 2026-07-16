@@ -74,6 +74,29 @@ test("curtain defaults carry the theme knobs", () => {
   assert.equal(c.background, undefined);
 });
 
+test("animation defaults include enabled, reducedMotion, and draw timing", () => {
+  const a = loadConfig(join(tmpdir(), "nope-herald-anim-xyz.json")).curtain
+    .animation;
+  assert.equal(a.enabled, true);
+  assert.equal(a.fps, 2);
+  assert.equal(a.reducedMotion, false);
+  assert.equal(a.drawFrames, 8);
+  assert.equal(a.drawMs, 600);
+});
+
+test("user can disable motion via merge (enabled false or reducedMotion)", () => {
+  const off = merge(DEFAULTS, {
+    curtain: { animation: { enabled: false } },
+  });
+  assert.equal(off.curtain.animation.enabled, false);
+  assert.equal(off.curtain.animation.fps, 2, "fps preserved");
+  const reduced = merge(DEFAULTS, {
+    curtain: { animation: { reducedMotion: true } },
+  });
+  assert.equal(reduced.curtain.animation.reducedMotion, true);
+  assert.equal(reduced.curtain.animation.enabled, true);
+});
+
 test("curtain focus defaults carry the event-driven adapter knobs", () => {
   const f = loadConfig("/nonexistent/does-not-exist.json").curtain.focus;
   assert.equal(f.source, "ssh-osascript");
