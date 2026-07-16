@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { test } from "node:test";
 import { BUILTINS } from "../lib/curtain/themes.mjs";
-import { renderCard, renderCardFrame } from "../lib/surfaces/curtain-card.mjs";
+import {
+  infoLines,
+  renderCard,
+  renderCardFrame,
+} from "../lib/surfaces/curtain-card.mjs";
 
 // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC (\x1b) is the literal byte that opens an SGR sequence; intentional.
 const plain = (s) => s.replace(/\x1b\[[0-9;]*m/g, "");
@@ -58,13 +62,20 @@ test("a working card with no subagents keeps the bare elapsed clock", () => {
   assert.doesNotMatch(text, /subagent/);
 });
 
-test("subagents never leak onto the DONE card; tasks show on WORKING", () => {
-  // Stop with subagents in flight is never DONE; bg tasks may still show on
-  // WORKING as "N task" (Grok bg shells) without being called "loops".
-  const done = renderCard("done", 0, 60, 10, { subagents: 3 })
-    .map(plain)
-    .join("\n");
-  assert.doesNotMatch(done, /subagent/);
+test("done tail lists parked subagents before tasks and watchers", () => {
+  const lines = infoLines("done", {
+    worked: 297,
+    subagents: 2,
+    shells: 3,
+    watchers: 1,
+  });
+  const tail = lines.find((l) => l.includes("in bg"));
+  assert.ok(tail, "expected a bg inventory line");
+  assert.match(tail, /2 subagents in bg · 3 tasks in bg · 1 watcher in bg/);
+});
+
+test("tasks show on WORKING without being called loops", () => {
+  // Bg tasks may show on WORKING as "N task" (Grok bg shells).
   const working = renderCard("working", 5, 60, 10, { shells: 2 })
     .map(plain)
     .join("\n");
