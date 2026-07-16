@@ -1595,6 +1595,112 @@ test("SessionEnd stamps DONE and clears all leases", () => {
   assert.equal(t.getSessOpt("s1", "@herald_leases"), "");
 });
 
+test("PostToolUse with agentId re-grants an expired subagent lease", () => {
+  // Parked monitor whose lease TTL-expired re-earns it on the next heartbeat
+  // tool call that carries agent_id (captured live 2026-07-16).
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  const ttl = 120;
+  stampFromHook(
+    "%9",
+    {
+      event: "SubagentStart",
+      agentId: "mon1",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+    },
+    0,
+    t,
+    { lease: { subagentTtlSec: ttl } },
+  );
+  assert.equal(liveAt(t, 0).subagent, 1);
+  // Quiet past expiry — no events; count decays to 0.
+  assert.equal(liveAt(t, ttl + 1).subagent, 0);
+  stampFromHook(
+    "%9",
+    {
+      event: "PostToolUse",
+      agentId: "mon1",
+      toolName: "Bash",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+    },
+    ttl + 50,
+    t,
+    { lease: { subagentTtlSec: ttl } },
+  );
+  assert.equal(liveAt(t, ttl + 50).subagent, 1);
+  const leases = parseLeases(t.getSessOpt("s1", "@herald_leases"));
+  const mon = leases.find((l) => l.kind === "subagent" && l.id === "mon1");
+  assert.ok(mon, "subagent:mon1 lease must exist");
+  assert.equal(mon.exp, ttl + 50 + ttl);
+});
+
+test("PreToolUse without agentId grants no subagent lease", () => {
+  // Main-agent tool call must not invent a subagent.
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  stampFromHook(
+    "%9",
+    {
+      event: "PreToolUse",
+      agentId: "",
+      toolName: "Bash",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+    },
+    1000,
+    t,
+  );
+  assert.equal(liveAt(t, 1000).subagent, 0);
+});
+
+test("SubagentStop does not resurrect the stopping agent", () => {
+  // SubagentStop for mon1 (which also carries agentId) must still end with
+  // no live subagent:mon1 lease — release wins over any agentId side path.
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  stampFromHook(
+    "%9",
+    {
+      event: "SubagentStart",
+      agentId: "mon1",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+    },
+    1000,
+    t,
+  );
+  assert.equal(liveAt(t, 1000).subagent, 1);
+  stampFromHook(
+    "%9",
+    {
+      event: "SubagentStop",
+      agentId: "mon1",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+    },
+    1100,
+    t,
+  );
+  assert.equal(liveAt(t, 1100).subagent, 0);
+  const leases = parseLeases(t.getSessOpt("s1", "@herald_leases"));
+  assert.equal(
+    leases.some((l) => l.kind === "subagent" && l.id === "mon1"),
+    false,
+  );
+});
+
 test("pid backstop: dead agent process forces DONE despite fresh leases", async () => {
   const { spawn } = await import("node:child_process");
   const { once } = await import("node:events");
