@@ -47,6 +47,8 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 trap 'exit 129' HUP
 tick=0
+draw_tick=0
+prev_draw=
 while :; do
   # One untargeted call dumps every option this repaint needs from the current
   # session. @herald_* values are single tokens, so `read -r k v` is safe.
@@ -63,6 +65,9 @@ while :; do
   theme=${O[@herald_theme]:-classic}
   frame_ms=${O[@herald_frame_ms]:-1000}
   covered=${O[@herald_covered]:-0}
+  draw=${O[@herald_draw]:-}
+  draw_ms=${O[@herald_draw_ms]:-75}
+  draw_frames=${O[@herald_draw_frames]:-8}
   # settleAfter is relative to state entry: a monotonic tick from arm freezes
   # DONE/COMPACTING animation after a long WORKING session. Reset on change so
   # the first paint of the new state uses tick 0.
@@ -71,6 +76,11 @@ while :; do
     tick=0
     prev_state=$state
   fi
+  # Act I stage-curtain: reset draw_tick when @herald_draw phase changes.
+  if [ "$draw" != "${prev_draw}" ]; then
+    draw_tick=0
+    prev_draw=$draw
+  fi
   # Defense-in-depth: unstick WORKING/COMPACTING when hooks go quiet (Grok
   # synthesis hosts). Fail-open; no-op when settle policy has nothing to do.
   herald curtain settle >/dev/null 2>&1 || true
@@ -78,22 +88,57 @@ while :; do
   herald curtain wash >/dev/null 2>&1 || true
   cols=$(tput cols 2>/dev/null || echo 80)
   rows=$(tput lines 2>/dev/null || echo 24)
+  # Stage draw flags for the pure render path (classic ignores them).
+  draw_flags=()
+  if [ "$draw" = "shut" ] || [ "$draw" = "open" ]; then
+    draw_flags=(--draw "$draw" --draw-tick "$draw_tick")
+  fi
   herald render --surface curtain-card \
     --state "${state:-idle}" --since "${since:-0}" \
     --leases "${leases:-}" \
     --worked "${worked:-0}" \
     --theme "${theme:-classic}" --tick "$tick" \
-    --cols "$cols" --rows "$rows" --color always 2>/dev/null || true
+    --cols "$cols" --rows "$rows" --color always \
+    "${draw_flags[@]}" 2>/dev/null || true
   tick=$((tick + 1))
-  # Pace: the theme's hot rate (frame_ms) ONLY while covered/visible; otherwise
-  # 1 s, so an animated theme on a revealed/detached session is not repainted
-  # 2x/sec for a card nobody is looking at.
-  if [ "$covered" = "1" ]; then ms=${frame_ms:-1000}; else ms=1000; fi
+  # Advance / complete stage-curtain phase on the existing tick loop.
+  if [ "$draw" = "shut" ] || [ "$draw" = "open" ]; then
+    draw_tick=$((draw_tick + 1))
+    # draw_frames frames indexed 0..N-1; complete once we've painted the last.
+    if [ "$draw_tick" -ge "${draw_frames:-8}" ]; then
+      if [ "$draw" = "open" ]; then
+        herald curtain reveal "$(tmux display -p '#{session_name}' 2>/dev/null)" >/dev/null 2>&1 || true
+      else
+        # Shut finished — clear phase so the steady card shows.
+        tmux set-option -u @herald_draw 2>/dev/null || true
+      fi
+      draw_tick=0
+      prev_draw=
+    fi
+  fi
+  # Pace: draw burst uses draw_ms (full shut/open ≤ ~600ms); else theme hot rate
+  # ONLY while covered/visible; otherwise 1 s.
+  if [ "$draw" = "shut" ] || [ "$draw" = "open" ]; then
+    ms=${draw_ms:-75}
+  elif [ "$covered" = "1" ]; then
+    ms=${frame_ms:-1000}
+  else
+    ms=1000
+  fi
   case "$ms" in
     "" | *[!0-9]*) secs=1 ;;
     *) secs=$(awk "BEGIN{printf \"%.3f\", $ms/1000}" 2>/dev/null || echo 1) ;;
   esac
   if read -rsn1 -t "$secs" 2>/dev/null; then
-    herald curtain reveal "$(tmux display -p '#{session_name}' 2>/dev/null)" >/dev/null 2>&1 || true
+    # Keypress: play open theatrics when a non-classic theme is mid-cover;
+    # otherwise reveal immediately (fail-open).
+    sess=$(tmux display -p '#{session_name}' 2>/dev/null)
+    if [ "${theme:-classic}" != "classic" ] && [ "$draw" != "open" ] && [ "$covered" = "1" ]; then
+      tmux set-option @herald_draw open 2>/dev/null || true
+      draw_tick=0
+      prev_draw=open
+    else
+      herald curtain reveal "$sess" >/dev/null 2>&1 || true
+    fi
   fi
 done
