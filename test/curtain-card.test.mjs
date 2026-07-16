@@ -494,6 +494,83 @@ test("optional model line renders when enabled with data", () => {
   assert.doesNotMatch(off, /grok-4\.5/);
 });
 
+// --- Act I theatrics (classic stays static; forge gets draw/sparks/breathe) ---
+
+test("classic with theatrics opts stays static (no fabric, no spark flood)", () => {
+  const base = renderCard("done", 0, 40, 10, {}, BUILTINS.classic, 0)
+    .map(plain)
+    .join("\n");
+  const withOpts = renderCard("done", 0, 40, 10, {}, BUILTINS.classic, 0, {
+    themeName: "classic",
+    animCfg: { enabled: true },
+    draw: "shut",
+    drawProgress: 1,
+  })
+    .map(plain)
+    .join("\n");
+  assert.equal(withOpts, base, "classic is the regression baseline");
+  assert.doesNotMatch(withOpts, /[░▒▓█]/);
+});
+
+test("forge DONE with theatrics paints spark rain into whitespace only", () => {
+  const art = renderCard("done", 0, 40, 14, {}, BUILTINS.forge, 0)
+    .map(plain)
+    .join("\n");
+  const rainy = renderCard("done", 0, 40, 14, {}, BUILTINS.forge, 0, {
+    themeName: "forge",
+    animCfg: { enabled: true },
+  })
+    .map(plain)
+    .join("\n");
+  // Sacred anvil / billet markers survive.
+  assert.match(rainy, /=======/);
+  assert.match(rainy, /\|###\|/);
+  // Sparks appear somewhere (overlay may land in margins).
+  assert.match(rainy, /[*.+]/);
+  // Art rows that had * . * already — still have structure.
+  assert.match(art, /\* \. \*/);
+});
+
+test("forge stage-curtain shut covers more cells as drawProgress rises", () => {
+  const early = renderCard("working", 5, 40, 12, {}, BUILTINS.forge, 0, {
+    themeName: "forge",
+    animCfg: { enabled: true },
+    draw: "shut",
+    drawProgress: 0.1,
+  })
+    .map(plain)
+    .join("");
+  const late = renderCard("working", 5, 40, 12, {}, BUILTINS.forge, 0, {
+    themeName: "forge",
+    animCfg: { enabled: true },
+    draw: "shut",
+    drawProgress: 0.95,
+  })
+    .map(plain)
+    .join("");
+  const count = (s) => (s.match(/[░▒▓█]/g) || []).length;
+  assert.ok(count(late) > count(early), "shut ramps fabric coverage");
+  assert.match(late, /[░▒▓█]/);
+});
+
+test("forge NEEDS breathe modulates red family without hard on/off only", () => {
+  // Render at two breathe phases; both stay "needs" red-ish SGR, differ in code.
+  const dim = renderCard("needs", 0, 40, 12, {}, BUILTINS.forge, 0, {
+    themeName: "forge",
+    animCfg: { enabled: true },
+    breatheT: 0, // cos(0)=1 → amp 1 → brightRed
+  }).join("\n");
+  const mid = renderCard("needs", 0, 40, 12, {}, BUILTINS.forge, 0, {
+    themeName: "forge",
+    animCfg: { enabled: true },
+    breatheT: 1.5, // half period of 3s → cos(π)=-1 → amp 0 → red
+  }).join("\n");
+  assert.match(dim, /NEEDS YOU|\/!\\/);
+  assert.match(mid, /NEEDS YOU|\/!\\/);
+  // Different SGR (brightRed 91 vs red 31) when color on.
+  assert.notEqual(dim, mid);
+});
+
 test("resolveModelLine records beat hint; disabled yields empty", async () => {
   const { resolveModelLine } = await import("../lib/surfaces/curtain-card.mjs");
   assert.equal(resolveModelLine({ enabled: false, modelHint: "x" }), "");
