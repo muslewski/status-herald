@@ -26,10 +26,22 @@ const snap = (o = {}) => {
 };
 
 test("SETTLE_DEFAULTS are fleet-safe", () => {
-  assert.equal(SETTLE_DEFAULTS.settleSynthQuietSec, 90);
+  // 300s quiet gives deep-thinking synthesis hosts headroom (turn TTL 120 +
+  // quiet 300 ≈ 7 min silence before DONE flash); PID backstop still wins.
+  assert.equal(SETTLE_DEFAULTS.settleSynthQuietSec, 300);
   assert.equal(SETTLE_DEFAULTS.settleSynthLeakSec, 360);
   assert.equal(SETTLE_DEFAULTS.maxWorkingSec, 0);
   assert.equal(SETTLE_DEFAULTS.maxNeedsSec, 0);
+});
+
+test("settleIfStale: default quiet threshold is 300 not 90", () => {
+  // Using SETTLE_DEFAULTS (no cfg override): quiet 90 must not settle;
+  // quiet 300 must.
+  assert.equal(settleIfStale(snap({ lastActive: 1000 }), 1090), null);
+  assert.deepEqual(settleIfStale(snap({ lastActive: 1000 }), 1300), {
+    state: "done",
+    clearLeases: true,
+  });
 });
 
 test("isActiveHookEvent ignores task_complete and synthetic prompts", () => {

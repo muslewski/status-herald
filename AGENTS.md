@@ -121,12 +121,12 @@ If cards look double-glitched or CPU spikes after many refreshes, check for orph
 - If sub count always 0 on Grok: expected (synthesized); Stop will still mark DONE unless a SubagentStart has been seen for that session since arm.
 - **Blank / empty curtain on new terminals (eventizer, main, …):** the card loop used bare `herald`, but new Grok panes often inherit a **different Node on PATH** (e.g. nvm v24) where `npm link` never installed the binary — render fails silently → empty screen. `scripts/curtain-card-session.sh` now resolves `$ROOT/bin/herald` absolutely. After upgrade: `herald curtain refresh` (or re-arm). Optional: `ln -sfn /path/to/status-herald/bin/herald ~/.local/bin/herald` and ensure `~/.local/bin` is on every PATH.
 - **Context bar wrong for Grok (1M, stale 💬, missing gauge):** live `session-sync.py` reads `~/.grok/active_sessions.json` + per-session `signals.json` + tail of `updates.jsonl`. Window/messages from signals (`contextWindowTokens` ≈500k, `userMessageCount` → 💬). **Used tokens** = `max(signals.contextTokensUsed, latest params._meta.totalTokens)` — signals alone is often stale mid-turn while the Grok CLI chrome tracks live `_meta.totalTokens`. Never use `turn_completed.usage.totalTokens` (cumulative API, millions). Herald: `discoverLiveGrokSessions` / `latestGrokMetaTotalTokens` in `lib/status/grok-adapter.mjs`.
-- **Grok has no `idle_prompt`.** Claude (`@herald_host_kind=task_list`) holds WORKING after the last subagent until idle. Grok (`synthesis` / `hybrid`) settles to DONE on Grok **Stop** (RC1: reconciles subagent leases empty) or when the last SubagentStop drains live leases.
+- **Grok has no `idle_prompt`.** Claude stays `@herald_host_kind=task_list` (bt-less Claude SubagentStart does **not** demote to hybrid) and holds WORKING after the last subagent until idle. Grok (`synthesis` / `hybrid`) settles to DONE on Grok **Stop** (RC1: reconciles subagent leases empty) or when the last SubagentStop drains live leases.
 - **Grok `/loop` + `monitor` + bg shells:** Stop only ends the main turn. Herald grants **watcher** leases (from `/loop`, `scheduler_create`, `monitor`; id-set so `/loop`+create = 1 watcher). Bg shells = **bg_shell** leases (tasks). Watcher leases are **informational only** — they never hold WORKING and never block settle (default TTL 900s for display/decay). Clear via `scheduler_delete` / kill tools.
 - **Stale DONE while thinking:** Grok often has no event mid-reason until a tool. We wire **PreToolUse** → WORKING, and treat **task-complete system injects** as WORKING. Re-run `herald curtain install` + `herald curtain install grok` after upgrade.
 - **Bar wash:** **off by default** so `@ctxbar` context stays visible. Optional sliding line only if `curtain.tmuxBar.wash: true`. Grok context window is **500k** (not Claude 1M).
 - **Synthetic UserPromptSubmit** does **not** re-assert WORKING after DONE.
-- **Quiet/leak settle:** card loop runs `herald curtain settle` each tick and stamps `@herald_settle_ts`. Synthesis/hybrid quiet → DONE after `curtain.settle.settleSynthQuietSec` (90s). Leaked subagent leases clear after `settleSynthLeakSec` (360s) or their own TTL (`curtain.lease.subagentTtlSec` 300s). Task-list hosts are not quiet-settled. Dead agent PID → DONE (`isPidAlive`). Run `herald doctor` for settle-health / RC3.
+- **Quiet/leak settle:** card loop runs `herald curtain settle` each tick and stamps `@herald_settle_ts`. Synthesis/hybrid quiet → DONE after `curtain.settle.settleSynthQuietSec` (300s). Leaked subagent leases clear after `settleSynthLeakSec` (360s) or their own TTL (`curtain.lease.subagentTtlSec` 300s). Task-list hosts are not quiet-settled. Dead agent PID → DONE (`isPidAlive`). Run `herald doctor` for settle-health / RC3.
 - Stuck WORKING with leftover `syn-*` ids: SubagentStop mismatch drops a `syn-*`; else wait for lease TTL / leak settle / next human prompt / `disarm && arm`.
 
 ## Config
@@ -139,7 +139,7 @@ See README "Config reference". Curtain works the same regardless of agent.
 | `curtain.lease.watcherTtlSec` | 900 | Watcher/loop lease TTL |
 | `curtain.lease.bgShellTtlSec` | 300 | Bg shell lease TTL |
 | `curtain.lease.turnTtlSec` | 120 | Turn activity lease TTL |
-| `curtain.settle.settleSynthQuietSec` | 90 | Quiet → DONE (synthesis/hybrid) |
+| `curtain.settle.settleSynthQuietSec` | 300 | Quiet → DONE (synthesis/hybrid) |
 | `curtain.settle.settleSynthLeakSec` | 360 | Leak clear for leftover subagents |
 | `curtain.settle.maxWorkingSec` | 0 | Absolute WORKING ceiling (0=off) |
 | `curtain.settle.maxNeedsSec` | 0 | Abandoned NEEDS (0=off) |

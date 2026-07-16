@@ -111,7 +111,7 @@ test("curtain.tmuxBar defaults to keep + wash off (context first)", () => {
 
 test("curtain.settle defaults are fleet-safe quiet/leak windows", () => {
   const s = DEFAULTS.curtain.settle;
-  assert.equal(s.settleSynthQuietSec, 90);
+  assert.equal(s.settleSynthQuietSec, 300);
   assert.equal(s.settleSynthLeakSec, 360);
   assert.equal(s.maxWorkingSec, 0);
   assert.equal(s.maxNeedsSec, 0);
