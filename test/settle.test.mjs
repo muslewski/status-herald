@@ -27,7 +27,7 @@ const snap = (o = {}) => {
 
 test("SETTLE_DEFAULTS are fleet-safe", () => {
   assert.equal(SETTLE_DEFAULTS.settleSynthQuietSec, 90);
-  assert.equal(SETTLE_DEFAULTS.settleSynthLeakSec, 180);
+  assert.equal(SETTLE_DEFAULTS.settleSynthLeakSec, 360);
   assert.equal(SETTLE_DEFAULTS.maxWorkingSec, 0);
   assert.equal(SETTLE_DEFAULTS.maxNeedsSec, 0);
 });
