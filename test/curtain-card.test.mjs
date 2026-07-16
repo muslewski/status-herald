@@ -249,9 +249,15 @@ test("forge framed card: anvil divider shares center with label and figure", () 
     ["done", 99, /\bDONE\b/],
     ["needs", 0, /NEEDS YOU/],
   ]) {
-    const lines = renderCard(state, 0, cols, 24, { worked: 90 }, BUILTINS.forge, tick).map(
-      plain,
-    );
+    const lines = renderCard(
+      state,
+      0,
+      cols,
+      24,
+      { worked: 90 },
+      BUILTINS.forge,
+      tick,
+    ).map(plain);
     const anvil = lines.find((l) => /={3,}/.test(l));
     const label = lines.find((l) => labelRe.test(l));
     assert.ok(anvil && label, `${state}: anvil + label`);
@@ -461,4 +467,39 @@ test("minimal COMPACTING collapses dots to the center", () => {
       .join("\n");
   assert.match(at(0), /· · · · ·/);
   assert.match(at(2), /···/);
+});
+
+test("optional model line renders when enabled with data", () => {
+  const withModel = renderCard("working", 10, 60, 10, {
+    subagents: 0,
+    modelLine: "grok-4.5@high",
+  })
+    .map(plain)
+    .join("\n");
+  assert.match(withModel, /grok-4\.5@high/);
+  const off = renderCard("working", 10, 60, 10, { subagents: 0 })
+    .map(plain)
+    .join("\n");
+  assert.doesNotMatch(off, /grok-4\.5/);
+});
+
+test("resolveModelLine records beat hint; disabled yields empty", async () => {
+  const { resolveModelLine } = await import("../lib/surfaces/curtain-card.mjs");
+  assert.equal(resolveModelLine({ enabled: false, modelHint: "x" }), "");
+  assert.equal(
+    resolveModelLine({
+      enabled: true,
+      records: [{ model: "m", effort: "high", written_by: "token-oracle" }],
+      bestModelRecordFn: () => ({
+        model: "m",
+        effort: "high",
+        written_by: "token-oracle",
+      }),
+    }),
+    "m@high",
+  );
+  assert.equal(
+    resolveModelLine({ enabled: true, modelHint: "hint-only" }),
+    "hint-only",
+  );
 });

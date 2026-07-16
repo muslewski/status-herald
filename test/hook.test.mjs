@@ -122,6 +122,21 @@ test("a user prompt starts work and restarts the clock", () => {
   assert.equal(resetsElapsed(ev({ event: "Stop" })), false);
 });
 
+test("SessionEnd forces DONE from any state", () => {
+  assert.equal(
+    nextState(STATES.WORKING, ev({ event: "SessionEnd" })),
+    STATES.DONE,
+  );
+  assert.equal(
+    nextState(STATES.NEEDS, ev({ event: "SessionEnd" })),
+    STATES.DONE,
+  );
+  assert.equal(
+    nextState(STATES.COMPACTING, ev({ event: "SessionEnd" })),
+    STATES.DONE,
+  );
+});
+
 test("synthetic UserPromptSubmit does not start work or reset the clock", () => {
   assert.equal(
     nextState(STATES.DONE, ev({ event: "UserPromptSubmit", synthetic: true })),

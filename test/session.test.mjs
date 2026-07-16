@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { countLive, parseLeases } from "../lib/curtain/lease.mjs";
 import {
   TITLE_FMT,
   applySettle,
@@ -17,6 +18,10 @@ import {
   stampFromHook,
   stampSession,
 } from "../lib/curtain/session.mjs";
+
+/** Live lease counts at nowSec (default far-future so tests see granted leases). */
+const liveAt = (t, nowSec = 0, sess = "s1") =>
+  countLive(parseLeases(t.getSessOpt(sess, "@herald_leases")), nowSec);
 
 // In-memory tmux double. Sessions: { [name]: { opts:{}, active:winId, windows:{winId:name} } }
 const makeT = (init = {}) => {
@@ -335,7 +340,7 @@ test("stampFromHook keeps a session WORKING when Stop leaves subagents running",
 
   stampFromHook("%9", ev({ subagents: 2, subagentIds: ["a", "b"] }), 2000, t);
   assert.equal(t.getSessOpt("s1", "@herald_state"), "working", "not done yet");
-  assert.equal(t.getSessOpt("s1", "@herald_bg_subagents"), "2");
+  assert.equal(liveAt(t).subagent, 2);
   assert.equal(
     t.getSessOpt("s1", "@herald_since"),
     "1000",
@@ -353,7 +358,7 @@ test("stampFromHook reports DONE with background shells still running", () => {
     t,
   );
   assert.equal(t.getSessOpt("s1", "@herald_state"), "done");
-  assert.equal(t.getSessOpt("s1", "@herald_bg_shells"), "1");
+  assert.equal(liveAt(t).bg_shell, 1);
 });
 
 test("stampFromHook leaves the counts alone for events without background_tasks (non start/stop)", () => {
@@ -385,7 +390,7 @@ test("stampFromHook leaves the counts alone for events without background_tasks 
     1001,
     t,
   );
-  assert.equal(t.getSessOpt("s1", "@herald_bg_subagents"), "2");
+  assert.equal(liveAt(t).subagent, 2);
 });
 
 test("stampFromHook: idle_prompt cannot call a subagent turn done", () => {
@@ -423,7 +428,7 @@ test("stampFromHook: idle_prompt cannot call a subagent turn done", () => {
     "working",
     "three subagents are still running",
   );
-  assert.equal(t.getSessOpt("s1", "@herald_bg_subagents"), "3");
+  assert.equal(liveAt(t).subagent, 3);
 
   // The last SubagentStop drains the count; only then does idle mean idle.
   stampFromHook(
@@ -455,9 +460,9 @@ test("id-set: same-id SubagentStarts are idempotent, distinct ones stack", () =>
   });
   stampFromHook("%9", start("a1"), 1000, t);
   stampFromHook("%9", start("a1"), 1001, t); // duplicate delivery
-  assert.equal(t.getSessOpt("s1", "@herald_bg_subagents"), "1", "dedup by id");
+  assert.equal(liveAt(t).subagent, 1, "dedup by id");
   stampFromHook("%9", start("a2"), 1002, t);
-  assert.equal(t.getSessOpt("s1", "@herald_bg_subagents"), "2");
+  assert.equal(liveAt(t).subagent, 2);
 });
 
 test("id-set: a Stop task list reconciles a leaked synthesized count", () => {
@@ -476,7 +481,7 @@ test("id-set: a Stop task list reconciles a leaked synthesized count", () => {
   });
   stampFromHook("%9", start("g1"), 1000, t);
   stampFromHook("%9", start("g2"), 1001, t);
-  assert.equal(t.getSessOpt("s1", "@herald_bg_subagents"), "2", "leaked to 2");
+  assert.equal(liveAt(t).subagent, 2, "leaked to 2");
   // Authoritative Stop, nothing actually running:
   stampFromHook(
     "%9",
@@ -484,11 +489,11 @@ test("id-set: a Stop task list reconciles a leaked synthesized count", () => {
     2000,
     t,
   );
-  assert.equal(t.getSessOpt("s1", "@herald_bg_subagents"), "0", "reconciled");
+  assert.equal(liveAt(t).subagent, 0, "reconciled");
   assert.equal(t.getSessOpt("s1", "@herald_state"), "done");
 });
 
-test("id-set: Grok Stop without tasks keeps WORKING while subagent ids remain", () => {
+test("Grok Stop without task list reconciles synth subagents to empty → DONE", () => {
   const t = makeT(freshSession());
   t.sessionOf = () => "s1";
   const start = (id) => ({
@@ -500,6 +505,8 @@ test("id-set: Grok Stop without tasks keeps WORKING while subagent ids remain", 
     subagentIds: [],
   });
   stampFromHook("%9", start("g1"), 1000, t);
+  stampFromHook("%9", start("g2"), 1001, t);
+  assert.equal(liveAt(t, 1001).subagent, 2);
   stampFromHook(
     "%9",
     {
@@ -512,8 +519,8 @@ test("id-set: Grok Stop without tasks keeps WORKING while subagent ids remain", 
     2000,
     t,
   );
-  assert.equal(t.getSessOpt("s1", "@herald_state"), "working");
-  assert.equal(t.getSessOpt("s1", "@herald_bg_subagents"), "1");
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "done");
+  assert.equal(liveAt(t, 2000).subagent, 0);
 });
 
 test("Grok: last SubagentStop with zero synth ids settles to DONE (no idle_prompt)", () => {
@@ -536,22 +543,10 @@ test("Grok: last SubagentStop with zero synth ids settles to DONE (no idle_promp
     subagentIds: [],
   });
   stampFromHook("%9", start("g1"), 1000, t);
-  stampFromHook(
-    "%9",
-    {
-      event: "Stop",
-      hasTasks: false,
-      subagents: 0,
-      shells: 0,
-      subagentIds: [],
-    },
-    2000,
-    t,
-  );
   assert.equal(t.getSessOpt("s1", "@herald_state"), "working");
-  assert.equal(t.getSessOpt("s1", "@herald_bg_subagents"), "1");
+  assert.equal(liveAt(t, 1000).subagent, 1);
   stampFromHook("%9", stopSub("g1"), 3000, t);
-  assert.equal(t.getSessOpt("s1", "@herald_bg_subagents"), "0");
+  assert.equal(liveAt(t, 3000).subagent, 0);
   assert.equal(
     t.getSessOpt("s1", "@herald_state"),
     "done",
@@ -575,7 +570,7 @@ test("Claude: last SubagentStop with hasTasks still holds WORKING until idle_pro
     t,
   );
   assert.equal(t.getSessOpt("s1", "@herald_state"), "working");
-  assert.equal(t.getSessOpt("s1", "@herald_tasks_seen"), "1");
+  assert.equal(t.getSessOpt("s1", "@herald_host_kind"), "task_list");
   stampFromHook(
     "%9",
     {
@@ -589,7 +584,7 @@ test("Claude: last SubagentStop with hasTasks still holds WORKING until idle_pro
     1100,
     t,
   );
-  assert.equal(t.getSessOpt("s1", "@herald_bg_subagents"), "0");
+  assert.equal(liveAt(t).subagent, 0);
   assert.equal(
     t.getSessOpt("s1", "@herald_state"),
     "working",
@@ -725,13 +720,15 @@ test("permission_prompt still wins over synthesis-only SubagentStop drain", () =
   assert.equal(t.getSessOpt("s1", "@herald_state"), "needs");
 });
 
-test("arm clears tasks_seen so a re-armed session can reclassify host", () => {
+test("arm clears host_kind so a re-armed session can reclassify host", () => {
   const t = makeT(freshSession());
-  t.setSessOpt("s1", "@herald_tasks_seen", "1");
+  t.setSessOpt("s1", "@herald_host_kind", "task_list");
+  t.setSessOpt("s1", "@herald_leases", "subagent:a:9999");
   // arm is no-op if already armed; force unarmed
   t.setSessOpt("s1", "@herald_armed", "0");
   arm("s1", t);
-  assert.equal(t.getSessOpt("s1", "@herald_tasks_seen"), "0");
+  assert.equal(t.getSessOpt("s1", "@herald_host_kind"), "synthesis");
+  assert.equal(t.getSessOpt("s1", "@herald_leases"), "");
 });
 
 test("shouldSettleSynthSubagentStop pure helper", () => {
@@ -771,8 +768,8 @@ test("SubagentStop with mismatched id drops a syn-* id (Grok pairing)", () => {
     1000,
     t,
   );
-  const ids = t.getSessOpt("s1", "@herald_bg_subagent_ids");
-  assert.match(ids, /^syn-/);
+  const leases = t.getSessOpt("s1", "@herald_leases");
+  assert.match(leases, /subagent:syn-/);
   stampFromHook(
     "%9",
     {
@@ -786,15 +783,15 @@ test("SubagentStop with mismatched id drops a syn-* id (Grok pairing)", () => {
     1001,
     t,
   );
-  assert.equal(t.getSessOpt("s1", "@herald_bg_subagents"), "0");
+  assert.equal(liveAt(t, 1001).subagent, 0);
   assert.equal(t.getSessOpt("s1", "@herald_state"), "done");
 });
 
 test("applySettle quiet-settles synthesis WORKING after quiet window", () => {
   const t = makeT(freshSession());
   t.setSessOpt("s1", "@herald_state", "working");
-  t.setSessOpt("s1", "@herald_bg_subagents", "0");
-  t.setSessOpt("s1", "@herald_tasks_seen", "0");
+  t.setSessOpt("s1", "@herald_leases", "");
+  t.setSessOpt("s1", "@herald_host_kind", "synthesis");
   t.setSessOpt("s1", "@herald_last_active", "1000");
   t.setSessOpt("s1", "@herald_since", "900");
   const ok = applySettle("s1", 1000 + 90, t, {
@@ -804,11 +801,11 @@ test("applySettle quiet-settles synthesis WORKING after quiet window", () => {
   assert.equal(t.getSessOpt("s1", "@herald_state"), "done");
 });
 
-test("applySettle does not settle Claude tasks_seen during pure generation", () => {
+test("applySettle does not settle Claude task_list during pure generation", () => {
   const t = makeT(freshSession());
   t.setSessOpt("s1", "@herald_state", "working");
-  t.setSessOpt("s1", "@herald_bg_subagents", "0");
-  t.setSessOpt("s1", "@herald_tasks_seen", "1");
+  t.setSessOpt("s1", "@herald_leases", "");
+  t.setSessOpt("s1", "@herald_host_kind", "task_list");
   t.setSessOpt("s1", "@herald_last_active", "1000");
   t.setSessOpt("s1", "@herald_since", "900");
   const ok = applySettle("s1", 1000 + 999, t, {
@@ -818,9 +815,10 @@ test("applySettle does not settle Claude tasks_seen during pure generation", () 
   assert.equal(t.getSessOpt("s1", "@herald_state"), "working");
 });
 
-test("Grok /loop: Stop stays WORKING while watchers > 0", () => {
+test("Grok /loop: Stop stays WORKING while watchers live; settle after TTL+quiet", () => {
   const t = makeT(freshSession());
   t.sessionOf = () => "s1";
+  const leaseCfg = { watcherTtlSec: 60 };
   stampFromHook(
     "%9",
     {
@@ -836,8 +834,9 @@ test("Grok /loop: Stop stays WORKING while watchers > 0", () => {
     },
     1000,
     t,
+    { lease: leaseCfg, settle: { settleSynthQuietSec: 90 } },
   );
-  assert.equal(t.getSessOpt("s1", "@herald_bg_watchers"), "1");
+  assert.equal(liveAt(t, 1000).watcher, 1);
   assert.equal(t.getSessOpt("s1", "@herald_state"), "working");
   stampFromHook(
     "%9",
@@ -853,13 +852,21 @@ test("Grok /loop: Stop stays WORKING while watchers > 0", () => {
     },
     1010,
     t,
+    { lease: leaseCfg, settle: { settleSynthQuietSec: 90 } },
   );
   assert.equal(
     t.getSessOpt("s1", "@herald_state"),
     "working",
     "must not DONE while /loop is watching",
   );
-  assert.equal(t.getSessOpt("s1", "@herald_bg_watchers"), "1");
+  assert.equal(liveAt(t, 1010).watcher, 1);
+  // Past watcher TTL (60) + quiet ≥ 90 from last_active 1010 → settle DONE
+  const ok = applySettle("s1", 1010 + 91, t, {
+    lease: leaseCfg,
+    settle: { settleSynthQuietSec: 90 },
+  });
+  assert.equal(ok, true);
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "done");
 });
 
 test("/loop prompt + scheduler_create is ONE watcher not two", () => {
@@ -895,13 +902,9 @@ test("/loop prompt + scheduler_create is ONE watcher not two", () => {
     1001,
     t,
   );
-  assert.equal(
-    t.getSessOpt("s1", "@herald_bg_watchers"),
-    "1",
-    "must not double-count /loop + create",
-  );
-  assert.match(t.getSessOpt("s1", "@herald_bg_watcher_ids"), /\bloop\b/);
-  assert.doesNotMatch(t.getSessOpt("s1", "@herald_bg_watcher_ids"), /pending/);
+  assert.equal(liveAt(t).watcher, 1, "must not double-count /loop + create");
+  assert.match(t.getSessOpt("s1", "@herald_leases"), /watcher:loop:/);
+  assert.doesNotMatch(t.getSessOpt("s1", "@herald_leases"), /loop-pending/);
 });
 
 test("bg shell is a task not a second watcher", () => {
@@ -937,8 +940,8 @@ test("bg shell is a task not a second watcher", () => {
     1001,
     t,
   );
-  assert.equal(t.getSessOpt("s1", "@herald_bg_watchers"), "1");
-  assert.equal(t.getSessOpt("s1", "@herald_bg_shells"), "1");
+  assert.equal(liveAt(t).watcher, 1);
+  assert.equal(liveAt(t).bg_shell, 1);
 });
 
 test("scheduler_delete clears watcher so Stop can DONE", () => {
@@ -959,7 +962,7 @@ test("scheduler_delete clears watcher so Stop can DONE", () => {
     1000,
     t,
   );
-  assert.equal(t.getSessOpt("s1", "@herald_bg_watchers"), "1");
+  assert.equal(liveAt(t).watcher, 1);
   stampFromHook(
     "%9",
     {
@@ -975,7 +978,7 @@ test("scheduler_delete clears watcher so Stop can DONE", () => {
     1010,
     t,
   );
-  assert.equal(t.getSessOpt("s1", "@herald_bg_watchers"), "0");
+  assert.equal(liveAt(t).watcher, 0);
   stampFromHook(
     "%9",
     {
@@ -992,6 +995,26 @@ test("scheduler_delete clears watcher so Stop can DONE", () => {
     t,
   );
   assert.equal(t.getSessOpt("s1", "@herald_state"), "done");
+});
+
+test("fake-clock: subagent lease expires without further events (TTL)", () => {
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  stampFromHook(
+    "%9",
+    {
+      event: "SubagentStart",
+      agentId: "a",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+    },
+    1000,
+    t,
+  );
+  assert.equal(liveAt(t, 1000).subagent, 1);
+  assert.equal(liveAt(t, 1000 + 121).subagent, 0);
 });
 
 test("applyWash uses transparent bg + sliding line when working", () => {
@@ -1091,10 +1114,10 @@ test("arm clears stale in-flight counts", () => {
   // Otherwise a re-arm inherits a count that no event will ever drain, and
   // every future idle_prompt is held at WORKING forever.
   const t = makeT(freshSession());
-  t.setSessOpt("s1", "@herald_bg_subagents", 3);
+  t.setSessOpt("s1", "@herald_leases", "subagent:x:9999");
   t.setSessOpt("s1", "@herald_worked", 999);
   arm("s1", t);
-  assert.equal(t.getSessOpt("s1", "@herald_bg_subagents"), "0");
+  assert.equal(liveAt(t).subagent, 0);
   assert.equal(t.getSessOpt("s1", "@herald_worked"), "0");
 });
 
@@ -1378,4 +1401,66 @@ test("arm honors a themeBySession glob over the global default", () => {
   const t = makeT(freshSession());
   arm("s1", t, { theme: "classic", themeBySession: { "s*": "forge" } });
   assert.equal(t.getSessOpt("s1", "@herald_theme"), "forge");
+});
+
+test("SessionEnd stamps DONE and clears all leases", () => {
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  stampFromHook(
+    "%9",
+    {
+      event: "SubagentStart",
+      agentId: "a",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+    },
+    1000,
+    t,
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "working");
+  assert.ok(liveAt(t).subagent >= 1);
+  stampFromHook(
+    "%9",
+    {
+      event: "SessionEnd",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+    },
+    1100,
+    t,
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "done");
+  assert.equal(t.getSessOpt("s1", "@herald_leases"), "");
+});
+
+test("pid backstop: dead agent process forces DONE despite fresh leases", async () => {
+  const { spawn } = await import("node:child_process");
+  const { once } = await import("node:events");
+  const child = spawn(process.execPath, ["-e", "setInterval(()=>{},1000)"], {
+    stdio: "ignore",
+  });
+  const t = makeT(freshSession());
+  arm("s1", t);
+  t.setSessOpt("s1", "@herald_state", "working");
+  t.setSessOpt(
+    "s1",
+    "@herald_leases",
+    `subagent:alive:${Math.floor(Date.now() / 1000) + 600}`,
+  );
+  t.setSessOpt("s1", "@herald_agent_pid", String(child.pid));
+  t.setSessOpt("s1", "@herald_last_active", "1000");
+  t.setSessOpt("s1", "@herald_since", "900");
+  t.setSessOpt("s1", "@herald_host_kind", "synthesis");
+  // Still alive → settle should not PID-kill
+  assert.equal(applySettle("s1", 1000, t, { settle: {} }), false);
+  child.kill("SIGKILL");
+  await once(child, "exit");
+  const ok = applySettle("s1", 1001, t, { settle: {} });
+  assert.equal(ok, true);
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "done");
+  assert.equal(t.getSessOpt("s1", "@herald_leases"), "");
 });

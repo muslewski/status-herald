@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "tool": "token-oracle",
+  "pid": 1234,
+  "ts": 1784200000000,
+  "ttl_ms": 30000,
+  "capabilities": ["sessions", "ratelimits"]
+}

@@ -31,7 +31,7 @@ import {
 import {
   feedSnapshot,
   readAccountUsage,
-} from "../lib/status/bridge-token-forecast.mjs";
+} from "../lib/status/bridge-token-oracle.mjs";
 
 // --- helpers for tests only ---
 async function loadFixture(name) {
@@ -172,7 +172,11 @@ test("contextFromGrokSignals prefers live _meta.totalTokens over stale signals",
 
 test("contextFromGrokSignals does not regress below signals when live is lower", () => {
   const c = contextFromGrokSignals(
-    { contextTokensUsed: 200000, contextWindowTokens: 500000, userMessageCount: 3 },
+    {
+      contextTokensUsed: 200000,
+      contextWindowTokens: 500000,
+      userMessageCount: 3,
+    },
     150000,
   );
   assert.equal(c.used, 200000);
@@ -184,7 +188,10 @@ test("latestGrokMetaTotalTokens reads _meta only, ignores cumulative usage", asy
     // Cumulative API usage must NOT win over live context meta.
     const lines = [
       JSON.stringify({
-        params: { _meta: { totalTokens: 90000 }, update: { sessionUpdate: "tool_call" } },
+        params: {
+          _meta: { totalTokens: 90000 },
+          update: { sessionUpdate: "tool_call" },
+        },
       }),
       JSON.stringify({
         params: {
@@ -195,10 +202,16 @@ test("latestGrokMetaTotalTokens reads _meta only, ignores cumulative usage", asy
         },
       }),
       JSON.stringify({
-        params: { _meta: { totalTokens: 128966 }, update: { sessionUpdate: "tool_call_update" } },
+        params: {
+          _meta: { totalTokens: 128966 },
+          update: { sessionUpdate: "tool_call_update" },
+        },
       }),
     ];
-    await fs.writeFile(path.join(dir, "updates.jsonl"), lines.join("\n") + "\n");
+    await fs.writeFile(
+      path.join(dir, "updates.jsonl"),
+      `${lines.join("\n")}\n`,
+    );
     assert.equal(latestGrokMetaTotalTokens(dir), 128966);
   });
 });
@@ -228,7 +241,7 @@ test("discoverLiveGrokSessions prefers live updates totalTokens over stale signa
     );
     await fs.writeFile(
       path.join(sessDir, "updates.jsonl"),
-      JSON.stringify({ params: { _meta: { totalTokens: 150000 } } }) + "\n",
+      `${JSON.stringify({ params: { _meta: { totalTokens: 150000 } } })}\n`,
     );
     await fs.writeFile(
       path.join(sessDir, "summary.json"),
@@ -276,7 +289,7 @@ test("shortModelBadge reproduces python families + effort glyph", () => {
 test("readAccountUsage from fixture snapshot", async () => {
   // Hermetic: pin now before fixture resets_at so wall-clock cannot stale the windows
   const u = await readAccountUsage({
-    snapshotPath: "test/fixtures/token-forecast-snapshot.json",
+    snapshotPath: "test/fixtures/agent-status/forecast.json",
     now: 1783950000,
   });
   assert.ok(u.fiveHour);
@@ -292,14 +305,14 @@ test("readAccountUsage from fixture snapshot", async () => {
 test("readAccountUsage respects injectable now for secsToReset", async () => {
   const now = 1783950000;
   const u = await readAccountUsage({
-    snapshotPath: "test/fixtures/token-forecast-snapshot.json",
+    snapshotPath: "test/fixtures/agent-status/forecast.json",
     now,
   });
-  // five_hour resets_at 1784000000 → 50000s remaining at pinned now
-  assert.equal(u.fiveHour.resetsAt, 1784000000);
-  assert.equal(u.fiveHour.secsToReset, 1784000000 - now);
-  assert.equal(u.weekly.resetsAt, 1785000000);
-  assert.equal(u.weekly.secsToReset, 1785000000 - now);
+  // oracle windows use reset_in_secs relative to now
+  assert.equal(u.fiveHour.secsToReset, 50000);
+  assert.equal(u.fiveHour.resetsAt, now + 50000);
+  assert.equal(u.weekly.secsToReset, 1050000);
+  assert.equal(u.weekly.resetsAt, now + 1050000);
 });
 
 test("feedSnapshot is best-effort and does not throw", async () => {
@@ -390,4 +403,73 @@ test("buildPerSessionData with injectable dirs loads transcript + meta", async (
     // meta fixture: Opus 4.8 + effort xhigh
     assert.equal(data.modelBadge, "Opus 🧠xhigh");
   });
+});
+
+test("discoverLiveGrokSessions: armed WORKING → working status (▶ glyph path)", async () => {
+  await withTempDir(async (dir) => {
+    const cwd = "/tmp/herald-glyph";
+    const sid = "glyph-1";
+    const sessDir = grokSessionDir(sid, cwd, dir);
+    await fs.mkdir(sessDir, { recursive: true });
+    await fs.writeFile(
+      path.join(dir, "active_sessions.json"),
+      JSON.stringify([{ session_id: sid, pid: process.pid, cwd }]),
+    );
+    await fs.writeFile(
+      path.join(sessDir, "signals.json"),
+      JSON.stringify({ contextTokensUsed: 1, contextWindowTokens: 500000 }),
+    );
+    const found = discoverLiveGrokSessions({
+      grokHome: dir,
+      alive: (pid) => pid === process.pid,
+      getSessOpt: (name, k) => {
+        if (k === "@herald_armed") return "1";
+        if (k === "@herald_state") return "working";
+        return "";
+      },
+      sessionNameFor: () => "s1",
+    });
+    assert.equal(found[0].status, "working");
+    assert.notEqual(found[0].status, "busy");
+  });
+});
+
+test("discoverLiveGrokSessions: armed DONE → idle; unarmed → unknown", async () => {
+  await withTempDir(async (dir) => {
+    const cwd = "/tmp/herald-glyph2";
+    const sid = "glyph-2";
+    const sessDir = grokSessionDir(sid, cwd, dir);
+    await fs.mkdir(sessDir, { recursive: true });
+    await fs.writeFile(
+      path.join(dir, "active_sessions.json"),
+      JSON.stringify([{ session_id: sid, pid: process.pid, cwd }]),
+    );
+    await fs.writeFile(
+      path.join(sessDir, "signals.json"),
+      JSON.stringify({ contextTokensUsed: 1, contextWindowTokens: 500000 }),
+    );
+    const done = discoverLiveGrokSessions({
+      grokHome: dir,
+      alive: (pid) => pid === process.pid,
+      getSessOpt: (_n, k) =>
+        k === "@herald_armed" ? "1" : k === "@herald_state" ? "done" : "",
+      sessionNameFor: () => "s1",
+    });
+    assert.equal(done[0].status, "idle");
+    const unarmed = discoverLiveGrokSessions({
+      grokHome: dir,
+      alive: (pid) => pid === process.pid,
+      getSessOpt: () => "",
+      sessionNameFor: () => "s1",
+    });
+    assert.equal(unarmed[0].status, "unknown");
+  });
+});
+
+test("stateGlyph maps working/idle/needs/unknown (no busy from grok path)", async () => {
+  const { stateGlyph } = await import("../lib/status/side-effects.mjs");
+  assert.equal(stateGlyph("working"), "▶");
+  assert.equal(stateGlyph("idle"), "⏸");
+  assert.equal(stateGlyph("needs"), "⚠");
+  assert.equal(stateGlyph("unknown"), "·");
 });

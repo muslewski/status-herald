@@ -193,6 +193,7 @@ import {
   buildAccountSliderItem,
   buildContextItem,
   buildModelItem,
+  buildSageItem,
   buildStateItem,
   formatCtxbarForTmux,
 } from "../lib/status/segments.mjs";
@@ -327,4 +328,19 @@ test("REGISTRY render fns produce items from compute-shaped ctx", () => {
   assert.equal(a5.id, "account5h");
   assert.match(a5.text, /^🕐 /);
   assert.match(a5.text, /57\.0M$/);
+});
+
+test("buildSageItem and sage registry soft-fail when absent", () => {
+  assert.equal(buildSageItem(""), null);
+  assert.equal(buildSageItem("alpha").text, "zone alpha");
+  assert.equal(REGISTRY.sage.enabled, false);
+  assert.equal(REGISTRY.sage.render({}), null);
+});
+
+test("token-forecast naming is gone (D3)", async () => {
+  const { execSync } = await import("node:child_process");
+  const hits = execSync("grep -rl token-forecast lib/ || true", {
+    encoding: "utf8",
+  }).trim();
+  assert.equal(hits, "");
 });
