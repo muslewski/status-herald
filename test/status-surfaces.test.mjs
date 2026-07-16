@@ -229,7 +229,7 @@ test("writeSessionMeta atomic shape", () => {
 test("renderTmuxStatus returns account gauges when enabled; respects skipSideEffects", async () => {
   const out = await renderTmuxStatus({
     skipSideEffects: true,
-    snapshotPath: "test/fixtures/token-forecast-snapshot.json",
+    snapshotPath: "test/fixtures/agent-status/forecast.json",
     now: 1783950000,
     config: DEFAULTS,
     clockText: "12:00",
@@ -246,7 +246,7 @@ test("renderTmuxStatus empty when tmux bars disabled", async () => {
   const out = await renderTmuxStatus({
     skipSideEffects: true,
     config: cfg,
-    snapshotPath: "test/fixtures/token-forecast-snapshot.json",
+    snapshotPath: "test/fixtures/agent-status/forecast.json",
     now: 1783950000,
   });
   assert.equal(out, "");

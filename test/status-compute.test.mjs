@@ -31,7 +31,7 @@ import {
 import {
   feedSnapshot,
   readAccountUsage,
-} from "../lib/status/bridge-token-forecast.mjs";
+} from "../lib/status/bridge-token-oracle.mjs";
 
 // --- helpers for tests only ---
 async function loadFixture(name) {
@@ -289,7 +289,7 @@ test("shortModelBadge reproduces python families + effort glyph", () => {
 test("readAccountUsage from fixture snapshot", async () => {
   // Hermetic: pin now before fixture resets_at so wall-clock cannot stale the windows
   const u = await readAccountUsage({
-    snapshotPath: "test/fixtures/token-forecast-snapshot.json",
+    snapshotPath: "test/fixtures/agent-status/forecast.json",
     now: 1783950000,
   });
   assert.ok(u.fiveHour);
@@ -305,14 +305,14 @@ test("readAccountUsage from fixture snapshot", async () => {
 test("readAccountUsage respects injectable now for secsToReset", async () => {
   const now = 1783950000;
   const u = await readAccountUsage({
-    snapshotPath: "test/fixtures/token-forecast-snapshot.json",
+    snapshotPath: "test/fixtures/agent-status/forecast.json",
     now,
   });
-  // five_hour resets_at 1784000000 → 50000s remaining at pinned now
-  assert.equal(u.fiveHour.resetsAt, 1784000000);
-  assert.equal(u.fiveHour.secsToReset, 1784000000 - now);
-  assert.equal(u.weekly.resetsAt, 1785000000);
-  assert.equal(u.weekly.secsToReset, 1785000000 - now);
+  // oracle windows use reset_in_secs relative to now
+  assert.equal(u.fiveHour.secsToReset, 50000);
+  assert.equal(u.fiveHour.resetsAt, now + 50000);
+  assert.equal(u.weekly.secsToReset, 1050000);
+  assert.equal(u.weekly.resetsAt, now + 1050000);
 });
 
 test("feedSnapshot is best-effort and does not throw", async () => {
