@@ -404,3 +404,72 @@ test("buildPerSessionData with injectable dirs loads transcript + meta", async (
     assert.equal(data.modelBadge, "Opus 🧠xhigh");
   });
 });
+
+test("discoverLiveGrokSessions: armed WORKING → working status (▶ glyph path)", async () => {
+  await withTempDir(async (dir) => {
+    const cwd = "/tmp/herald-glyph";
+    const sid = "glyph-1";
+    const sessDir = grokSessionDir(sid, cwd, dir);
+    await fs.mkdir(sessDir, { recursive: true });
+    await fs.writeFile(
+      path.join(dir, "active_sessions.json"),
+      JSON.stringify([{ session_id: sid, pid: process.pid, cwd }]),
+    );
+    await fs.writeFile(
+      path.join(sessDir, "signals.json"),
+      JSON.stringify({ contextTokensUsed: 1, contextWindowTokens: 500000 }),
+    );
+    const found = discoverLiveGrokSessions({
+      grokHome: dir,
+      alive: (pid) => pid === process.pid,
+      getSessOpt: (name, k) => {
+        if (k === "@herald_armed") return "1";
+        if (k === "@herald_state") return "working";
+        return "";
+      },
+      sessionNameFor: () => "s1",
+    });
+    assert.equal(found[0].status, "working");
+    assert.notEqual(found[0].status, "busy");
+  });
+});
+
+test("discoverLiveGrokSessions: armed DONE → idle; unarmed → unknown", async () => {
+  await withTempDir(async (dir) => {
+    const cwd = "/tmp/herald-glyph2";
+    const sid = "glyph-2";
+    const sessDir = grokSessionDir(sid, cwd, dir);
+    await fs.mkdir(sessDir, { recursive: true });
+    await fs.writeFile(
+      path.join(dir, "active_sessions.json"),
+      JSON.stringify([{ session_id: sid, pid: process.pid, cwd }]),
+    );
+    await fs.writeFile(
+      path.join(sessDir, "signals.json"),
+      JSON.stringify({ contextTokensUsed: 1, contextWindowTokens: 500000 }),
+    );
+    const done = discoverLiveGrokSessions({
+      grokHome: dir,
+      alive: (pid) => pid === process.pid,
+      getSessOpt: (_n, k) =>
+        k === "@herald_armed" ? "1" : k === "@herald_state" ? "done" : "",
+      sessionNameFor: () => "s1",
+    });
+    assert.equal(done[0].status, "idle");
+    const unarmed = discoverLiveGrokSessions({
+      grokHome: dir,
+      alive: (pid) => pid === process.pid,
+      getSessOpt: () => "",
+      sessionNameFor: () => "s1",
+    });
+    assert.equal(unarmed[0].status, "unknown");
+  });
+});
+
+test("stateGlyph maps working/idle/needs/unknown (no busy from grok path)", async () => {
+  const { stateGlyph } = await import("../lib/status/side-effects.mjs");
+  assert.equal(stateGlyph("working"), "▶");
+  assert.equal(stateGlyph("idle"), "⏸");
+  assert.equal(stateGlyph("needs"), "⚠");
+  assert.equal(stateGlyph("unknown"), "·");
+});
