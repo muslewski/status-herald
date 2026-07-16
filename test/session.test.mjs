@@ -737,6 +737,111 @@ test("arm clears host_kind so a re-armed session can reclassify host", () => {
   assert.equal(t.getSessOpt("s1", "@herald_leases"), "");
 });
 
+// P8 host-kind truth: Claude SubagentStart never carries background_tasks
+// (captured live 2026-07-16). Demoting on that false signal put every
+// multi-subagent Claude session on synthesis quiet-settle heuristics.
+test("claude SubagentStart does not demote task_list to hybrid", () => {
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  t.setSessOpt("s1", "@herald_host_kind", "task_list");
+  t.setSessOpt("s1", "@herald_state", "working");
+  stampFromHook(
+    "%9",
+    {
+      event: "SubagentStart",
+      agentId: "lane1",
+      sourceCli: "claude",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+    },
+    1000,
+    t,
+  );
+  assert.equal(
+    t.getSessOpt("s1", "@herald_host_kind"),
+    "task_list",
+    "Claude bt-less SubagentStart must not demote task_list",
+  );
+});
+
+test("grok SubagentStart still demotes task_list to hybrid", () => {
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  t.setSessOpt("s1", "@herald_host_kind", "task_list");
+  t.setSessOpt("s1", "@herald_state", "working");
+  stampFromHook(
+    "%9",
+    {
+      event: "SubagentStart",
+      agentId: "g1",
+      sourceCli: "grok",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+    },
+    1000,
+    t,
+  );
+  assert.equal(
+    t.getSessOpt("s1", "@herald_host_kind"),
+    "hybrid",
+    "non-Claude bt-less SubagentStart still proves host mixing",
+  );
+});
+
+test("claude hasTasks event re-promotes hybrid to task_list", () => {
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  t.setSessOpt("s1", "@herald_host_kind", "hybrid");
+  t.setSessOpt("s1", "@herald_state", "working");
+  stampFromHook(
+    "%9",
+    {
+      event: "Stop",
+      sourceCli: "claude",
+      hasTasks: true,
+      subagents: 1,
+      shells: 0,
+      subagentIds: ["a1"],
+    },
+    1000,
+    t,
+  );
+  assert.equal(
+    t.getSessOpt("s1", "@herald_host_kind"),
+    "task_list",
+    "Claude task list must reclaim task_list from hybrid",
+  );
+});
+
+test("grok hasTasks event does not re-promote hybrid", () => {
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  t.setSessOpt("s1", "@herald_host_kind", "hybrid");
+  t.setSessOpt("s1", "@herald_state", "working");
+  stampFromHook(
+    "%9",
+    {
+      event: "Stop",
+      sourceCli: "grok",
+      hasTasks: true,
+      subagents: 1,
+      shells: 0,
+      subagentIds: ["g1"],
+    },
+    1000,
+    t,
+  );
+  assert.equal(
+    t.getSessOpt("s1", "@herald_host_kind"),
+    "hybrid",
+    "Grok backgroundTasks must not promote hybrid back to task_list",
+  );
+});
+
 test("shouldSettleSynthSubagentStop pure helper", () => {
   assert.equal(
     shouldSettleSynthSubagentStop({
