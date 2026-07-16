@@ -7,6 +7,27 @@
 # transparent — the old name can never strand the card on the classic-idle
 # fallback, and reveal always targets the live name.
 set -u
+
+# Resolve herald by absolute path next to this script. New Grok panes often ship
+# a PATH that points at a different Node (e.g. nvm v24) where `npm link` never
+# installed `herald` — a bare `herald` then fails silently (stderr → /dev/null)
+# and the curtain is an empty screen. Absolute path always hits this checkout.
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+HERALD_BIN="${HERALD_BIN:-$ROOT/bin/herald}"
+if [ ! -x "$HERALD_BIN" ]; then
+  # Last-ditch: whatever `herald` is on PATH (older arms / custom installs).
+  HERALD_BIN="$(command -v herald 2>/dev/null || true)"
+fi
+herald() {
+  if [ -n "${HERALD_BIN:-}" ] && [ -x "$HERALD_BIN" ]; then
+    "$HERALD_BIN" "$@"
+  else
+    # Visible failure beat a blank pane (operators can see the path problem).
+    printf '\033[H\033[2Jherald binary not found\n(expected %s/bin/herald)\n' "$ROOT"
+    return 127
+  fi
+}
+
 printf '\033[?25l'
 # On exit, reveal — which (when tmuxBar coupling is on) restores the status bar,
 # so a killed loop can't strand the dropped background.

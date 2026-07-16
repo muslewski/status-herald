@@ -194,6 +194,7 @@ import {
   buildContextItem,
   buildModelItem,
   buildStateItem,
+  formatCtxbarForTmux,
 } from "../lib/status/segments.mjs";
 
 test("buildContextItem parity plain core (emoji band, bar8, pct, used/win, msgs)", () => {
@@ -212,6 +213,28 @@ test("buildContextItem parity plain core (emoji band, bar8, pct, used/win, msgs)
   // Plain text (no ANSI/tmux markup); emoji count as wide in visibleWidth.
   assert.equal(item.text.includes("#[fg="), false);
   assert.ok(visibleWidth(item.text) >= 20);
+});
+
+test("formatCtxbarForTmux embeds ctx_bucket color + 💬 message count", () => {
+  const s = formatCtxbarForTmux({
+    used: 375752,
+    win: 500000,
+    pct: 75,
+    messages: 25,
+  });
+  // 375752 // 100000 = 3 → 😐; filled = round(0.75*8)=6; pct>50 → red
+  assert.equal(s, "😐 #[fg=red]██████░░ 75% 375k/500k 💬 25#[default]");
+});
+
+test("buildContextItem shows 500k window label for Grok", () => {
+  const item = buildContextItem({
+    used: 120000,
+    win: 500000,
+    pct: 24,
+    messages: 7,
+  });
+  assert.match(item.text, /120k\/500k/);
+  assert.match(item.text, /💬 7/);
 });
 
 test("buildAccountSliderItem 5h from used+cap (Python _slider plain core)", () => {

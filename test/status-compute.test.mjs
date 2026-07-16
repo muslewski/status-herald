@@ -19,7 +19,14 @@ import {
   shortModelBadge,
 } from "../lib/status/compute.mjs";
 
-import { detectGrok, readProcStatusPpid } from "../lib/status/grok-adapter.mjs";
+import {
+  contextFromGrokSignals,
+  detectGrok,
+  discoverLiveGrokSessions,
+  grokSessionDir,
+  latestGrokMetaTotalTokens,
+  readProcStatusPpid,
+} from "../lib/status/grok-adapter.mjs";
 
 import {
   feedSnapshot,
@@ -123,6 +130,127 @@ test("isGrokProcess on current test pid may be polluted by test cmdline but dete
   // Just ensure it does not throw and returns a boolean shape.
   const g = detectGrok(process.pid);
   assert.ok(typeof g.isGrok === "boolean");
+});
+
+test("contextFromGrokSignals maps tokens + userMessageCount (💬 parity)", () => {
+  const c = contextFromGrokSignals({
+    contextTokensUsed: 375752,
+    contextWindowTokens: 500000,
+    contextWindowUsage: 75,
+    userMessageCount: 25,
+  });
+  assert.equal(c.used, 375752);
+  assert.equal(c.win, 500_000);
+  assert.equal(c.pct, 75);
+  assert.equal(c.messages, 25);
+});
+
+test("contextFromGrokSignals defaults to 500k window and zero messages", () => {
+  const c = contextFromGrokSignals({});
+  assert.equal(c.win, 500_000);
+  assert.equal(c.used, 0);
+  assert.equal(c.messages, 0);
+  assert.equal(c.pct, 0);
+});
+
+test("contextFromGrokSignals prefers live _meta.totalTokens over stale signals", () => {
+  // Bug: mid-turn signals stays at 103969/20% while CLI shows ~128k/25%.
+  const c = contextFromGrokSignals(
+    {
+      contextTokensUsed: 103969,
+      contextWindowTokens: 500000,
+      contextWindowUsage: 20, // stale — must not be trusted when live is higher
+      userMessageCount: 26,
+    },
+    128966,
+  );
+  assert.equal(c.used, 128966);
+  assert.equal(c.pct, 25); // floor(128966*100/500000)
+  assert.equal(c.messages, 26);
+  assert.equal(c.win, 500_000);
+});
+
+test("contextFromGrokSignals does not regress below signals when live is lower", () => {
+  const c = contextFromGrokSignals(
+    { contextTokensUsed: 200000, contextWindowTokens: 500000, userMessageCount: 3 },
+    150000,
+  );
+  assert.equal(c.used, 200000);
+  assert.equal(c.pct, 40);
+});
+
+test("latestGrokMetaTotalTokens reads _meta only, ignores cumulative usage", async () => {
+  await withTempDir(async (dir) => {
+    // Cumulative API usage must NOT win over live context meta.
+    const lines = [
+      JSON.stringify({
+        params: { _meta: { totalTokens: 90000 }, update: { sessionUpdate: "tool_call" } },
+      }),
+      JSON.stringify({
+        params: {
+          update: {
+            sessionUpdate: "turn_completed",
+            usage: { totalTokens: 1895396, inputTokens: 1800000 },
+          },
+        },
+      }),
+      JSON.stringify({
+        params: { _meta: { totalTokens: 128966 }, update: { sessionUpdate: "tool_call_update" } },
+      }),
+    ];
+    await fs.writeFile(path.join(dir, "updates.jsonl"), lines.join("\n") + "\n");
+    assert.equal(latestGrokMetaTotalTokens(dir), 128966);
+  });
+});
+
+test("discoverLiveGrokSessions prefers live updates totalTokens over stale signals", async () => {
+  await withTempDir(async (dir) => {
+    const cwd = "/tmp/herald-grok-fixture";
+    const sid = "sess-grok-1";
+    const sessDir = grokSessionDir(sid, cwd, dir);
+    await fs.mkdir(sessDir, { recursive: true });
+    await fs.writeFile(
+      path.join(dir, "active_sessions.json"),
+      JSON.stringify([
+        { session_id: sid, pid: process.pid, cwd },
+        { session_id: "dead", pid: 999999999, cwd: "/x" },
+      ]),
+    );
+    await fs.writeFile(
+      path.join(sessDir, "signals.json"),
+      JSON.stringify({
+        contextTokensUsed: 100000, // stale
+        contextWindowTokens: 500000,
+        contextWindowUsage: 20,
+        userMessageCount: 7,
+        primaryModelId: "grok-4.5",
+      }),
+    );
+    await fs.writeFile(
+      path.join(sessDir, "updates.jsonl"),
+      JSON.stringify({ params: { _meta: { totalTokens: 150000 } } }) + "\n",
+    );
+    await fs.writeFile(
+      path.join(sessDir, "summary.json"),
+      JSON.stringify({
+        current_model_id: "grok-4.5",
+        reasoning_effort: "high",
+      }),
+    );
+    const found = discoverLiveGrokSessions({
+      grokHome: dir,
+      alive: (pid) => pid === process.pid,
+    });
+    assert.equal(found.length, 1);
+    assert.equal(found[0].sessionId, sid);
+    assert.equal(found[0].isGrok, true);
+    assert.equal(found[0].context.messages, 7);
+    assert.equal(found[0].context.used, 150000); // live wins
+    assert.equal(found[0].context.pct, 30);
+    assert.equal(found[0].context.win, 500_000);
+    assert.equal(found[0].messages, 7);
+    assert.match(found[0].modelBadge, /Grok/);
+  });
 });
 
 // ===== Task 3 sidecar + badge =====

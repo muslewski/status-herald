@@ -235,6 +235,83 @@ test("forge working art keeps the head centered over the anvil", () => {
   );
 });
 
+test("forge framed card: anvil divider shares center with label and figure", () => {
+  // Root cause of "equals not aligned": labels used full-width padCenter while
+  // art used a rigid 7-col block — DONE/NEEDS YOU left edges drifted from =======.
+  const cols = 89;
+  const inkCenter = (l) => {
+    const a = l.search(/\S/);
+    const b = l.trimEnd().length;
+    return (a + b) / 2;
+  };
+  for (const [state, tick, labelRe] of [
+    ["working", 0, /WORKING/],
+    ["done", 99, /\bDONE\b/],
+    ["needs", 0, /NEEDS YOU/],
+  ]) {
+    const lines = renderCard(state, 0, cols, 24, { worked: 90 }, BUILTINS.forge, tick).map(
+      plain,
+    );
+    const anvil = lines.find((l) => /={3,}/.test(l));
+    const label = lines.find((l) => labelRe.test(l));
+    assert.ok(anvil && label, `${state}: anvil + label`);
+    assert.ok(
+      Math.abs(inkCenter(anvil) - inkCenter(label)) <= 0.5,
+      `${state}: anvil center ${inkCenter(anvil)} vs label ${inkCenter(label)}`,
+    );
+  }
+});
+
+test("forge DONE settled check sits on the anvil center axis", () => {
+  const cols = 89;
+  const lines = renderCard("done", 0, cols, 24, {}, BUILTINS.forge, 99).map(
+    plain,
+  );
+  const inkCenter = (l) => {
+    const a = l.search(/\S/);
+    const b = l.trimEnd().length;
+    return (a + b) / 2;
+  };
+  const anvil = lines.find((l) => /={3,}/.test(l));
+  const vee = lines.find((l) => /V/.test(l));
+  const slash = lines.find((l) => /\/\s*$/.test(l.trimEnd()) || /\/\s/.test(l));
+  assert.ok(anvil && vee, "anvil + V");
+  assert.ok(
+    Math.abs(inkCenter(anvil) - inkCenter(vee)) <= 0.5,
+    `V center ${inkCenter(vee)} vs anvil ${inkCenter(anvil)}`,
+  );
+  // Top slash must not sit a full cell right of the anvil center (old art: / at col 5 of 0..6).
+  if (slash) {
+    assert.ok(
+      Math.abs(inkCenter(anvil) - inkCenter(slash)) <= 1.5,
+      `slash center ${inkCenter(slash)} vs anvil ${inkCenter(anvil)}`,
+    );
+  }
+});
+
+test("forge art is single-cell ASCII (no ambiguous middle-dot ·)", () => {
+  // · is East-Asian Ambiguous width; on some terminals it is 2 cells and
+  // walks the ======= divider off the figure mid-animation.
+  const frames = Object.values(BUILTINS.forge.states).flatMap(
+    (s) => s.frames || [],
+  );
+  for (const fr of frames) {
+    for (const line of fr) {
+      assert.doesNotMatch(line, /[·•✅⚠●—…]/);
+    }
+    // Anvil frames are a fixed 7-col author grid so ======= stays locked to the figure.
+    if (fr.some((l) => /={3,}/.test(l))) {
+      for (const line of fr) {
+        assert.equal(
+          line.length,
+          7,
+          `anvil-grid line must be 7 cols, got ${JSON.stringify(line)}`,
+        );
+      }
+    }
+  }
+});
+
 test("forge DONE settled frame is multi-row ASCII check on anvil", () => {
   const cols = 40;
   const lines = renderCard(
@@ -346,6 +423,12 @@ test("forge DONE animates sparks then settles on large ASCII check", () => {
   assert.match(sparks, /\* \. \*/, "tick 0 shows sparks over the billet");
   assert.match(sparks, /=======/, "keeps the anvil");
   assert.match(sparks, /\|###\|/, "working-scale billet");
+  // tick 1 uses ASCII '.' sparks (not middle-dot ·) so cell width stays 1
+  const cool = renderCard("done", 0, 24, 14, {}, BUILTINS.forge, 1)
+    .map(plain)
+    .join("\n");
+  assert.match(cool, /\. \./, "cooling sparks are ASCII dots");
+  assert.doesNotMatch(cool, /·/);
   const settled = renderCard("done", 0, 24, 14, {}, BUILTINS.forge, 99)
     .map(plain)
     .join("\n");
