@@ -467,8 +467,8 @@ test("id-set: same-id SubagentStarts are idempotent, distinct ones stack", () =>
 
 test("id-set: a Stop task list reconciles a leaked synthesized count", () => {
   // Grok-style: two SubagentStarts synthesize a count of 2, but their Stops are
-  // dropped. A later authoritative Stop carrying an empty running list must
-  // overwrite the leak, not add to it -- self-healing the desync.
+  // dropped. A later Grok Stop (no task list) must overwrite the leak via RC1.
+  // Claude Stop with empty background_tasks is intentionally NOT trusted to wipe.
   const t = makeT(freshSession());
   t.sessionOf = () => "s1";
   const start = (id) => ({
@@ -482,10 +482,16 @@ test("id-set: a Stop task list reconciles a leaked synthesized count", () => {
   stampFromHook("%9", start("g1"), 1000, t);
   stampFromHook("%9", start("g2"), 1001, t);
   assert.equal(liveAt(t).subagent, 2, "leaked to 2");
-  // Authoritative Stop, nothing actually running:
+  // Grok Stop (hasTasks false) reconciles synth subagents to empty:
   stampFromHook(
     "%9",
-    { event: "Stop", hasTasks: true, subagents: 0, shells: 0, subagentIds: [] },
+    {
+      event: "Stop",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+    },
     2000,
     t,
   );
@@ -1007,7 +1013,7 @@ test("fake-clock: subagent lease expires without further events (TTL)", () => {
     t,
   );
   assert.equal(liveAt(t, 1000).subagent, 1);
-  assert.equal(liveAt(t, 1000 + 121).subagent, 0);
+  assert.equal(liveAt(t, 1000 + 301).subagent, 0); // default subagentTtlSec 300
 });
 
 test("immortal-watcher repro: Monitor + busy session + Stop → DONE; watcher exp never re-armed", () => {
@@ -1063,8 +1069,8 @@ test("immortal-watcher repro: Monitor + busy session + Stop → DONE; watcher ex
 test("PostToolUse does not extend watcher exp; does re-arm subagent", () => {
   const t = makeT(freshSession());
   t.sessionOf = () => "s1";
-  // Seed leases granted at t=0 with default TTLs (watcher 900, subagent 120).
-  t.setSessOpt("s1", "@herald_leases", "watcher:mon:900,subagent:s1:120");
+  // Seed leases granted at t=0 with default TTLs (watcher 900, subagent 300).
+  t.setSessOpt("s1", "@herald_leases", "watcher:mon:900,subagent:s1:300");
   t.setSessOpt("s1", "@herald_state", "working");
   stampFromHook(
     "%9",
@@ -1085,7 +1091,7 @@ test("PostToolUse does not extend watcher exp; does re-arm subagent", () => {
   const mon = leases.find((l) => l.id === "mon");
   const sub = leases.find((l) => l.kind === "subagent");
   assert.equal(mon.exp, 900, "watcher must keep exp from grant, not re-arm");
-  assert.equal(sub.exp, 100 + 120, "subagent must be re-armed by activity");
+  assert.equal(sub.exp, 100 + 300, "subagent must be re-armed by activity");
 });
 
 test("non-synthetic UserPromptSubmit blanks legacy @herald_bg_watchers", () => {
@@ -1593,6 +1599,365 @@ test("SessionEnd stamps DONE and clears all leases", () => {
   );
   assert.equal(t.getSessOpt("s1", "@herald_state"), "done");
   assert.equal(t.getSessOpt("s1", "@herald_leases"), "");
+});
+
+test("Claude Stop with empty background_tasks does not wipe live subagent/shell leases", () => {
+  // False-empty Stop (captured live 2026-07-16): background_tasks: [] while
+  // monitors/shells still alive. Empty Stop must not wipe; TTL decay retires.
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  stampFromHook(
+    "%9",
+    {
+      event: "SubagentStart",
+      agentId: "mon1",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+    },
+    1000,
+    t,
+  );
+  stampFromHook(
+    "%9",
+    {
+      event: "Stop",
+      hasTasks: true,
+      subagents: 1,
+      shells: 1,
+      subagentIds: ["mon1"],
+      shellIds: ["sh1"],
+    },
+    1010,
+    t,
+  );
+  assert.equal(liveAt(t, 1010).subagent, 1);
+  assert.equal(liveAt(t, 1010).bg_shell, 1);
+  stampFromHook(
+    "%9",
+    {
+      event: "Stop",
+      hasTasks: true,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+      shellIds: [],
+    },
+    1020,
+    t,
+  );
+  assert.equal(
+    liveAt(t, 1020).subagent,
+    1,
+    "empty Stop must not wipe subagent",
+  );
+  assert.equal(liveAt(t, 1020).bg_shell, 1, "empty Stop must not wipe shell");
+});
+
+test("Claude Stop with non-empty background_tasks stays authoritative", () => {
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  stampFromHook(
+    "%9",
+    {
+      event: "Stop",
+      hasTasks: true,
+      subagents: 2,
+      shells: 0,
+      subagentIds: ["mon1", "stale2"],
+    },
+    1000,
+    t,
+  );
+  assert.equal(liveAt(t, 1000).subagent, 2);
+  stampFromHook(
+    "%9",
+    {
+      event: "Stop",
+      hasTasks: true,
+      subagents: 1,
+      shells: 0,
+      subagentIds: ["mon1"],
+    },
+    1100,
+    t,
+  );
+  assert.equal(liveAt(t, 1100).subagent, 1);
+  const leases = parseLeases(t.getSessOpt("s1", "@herald_leases"));
+  assert.ok(leases.some((l) => l.kind === "subagent" && l.id === "mon1"));
+  assert.equal(
+    leases.some((l) => l.kind === "subagent" && l.id === "stale2"),
+    false,
+  );
+});
+
+test("SubagentStop with empty inflight list still reconciles to empty", () => {
+  // Last subagent reporting: SubagentStop + empty inflight must not strand WORKING.
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  stampFromHook(
+    "%9",
+    {
+      event: "Stop",
+      hasTasks: true,
+      subagents: 1,
+      shells: 0,
+      subagentIds: ["mon1"],
+    },
+    1000,
+    t,
+  );
+  assert.equal(liveAt(t, 1000).subagent, 1);
+  stampFromHook(
+    "%9",
+    {
+      event: "SubagentStop",
+      agentId: "mon1",
+      hasTasks: true,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+    },
+    1100,
+    t,
+  );
+  assert.equal(liveAt(t, 1100).subagent, 0);
+});
+
+test("Grok Stop (no tasks) still reconciles subagents to empty", () => {
+  // RC1 unchanged: hasTasks false + Stop clears synth subagents.
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  stampFromHook(
+    "%9",
+    {
+      event: "SubagentStart",
+      agentId: "g1",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+    },
+    1000,
+    t,
+  );
+  assert.equal(liveAt(t, 1000).subagent, 1);
+  stampFromHook(
+    "%9",
+    {
+      event: "Stop",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+    },
+    2000,
+    t,
+  );
+  assert.equal(liveAt(t, 2000).subagent, 0);
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "done");
+});
+
+test("monitor-sandwich lifecycle: heartbeats heal past old TTL; empty Stop keeps fleet; SubagentStop settles", () => {
+  // Live repro lock: SubagentStart → quiet gaps beyond old 120s TTL → heartbeat
+  // Pre/PostToolUse with agentId re-grants → empty Claude Stop does not wipe →
+  // SubagentStop with empty inflight drains → idle_prompt reaches DONE.
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  const base = {
+    hasTasks: false,
+    subagents: 0,
+    shells: 0,
+    subagentIds: [],
+  };
+  stampFromHook(
+    "%9",
+    {
+      event: "SubagentStart",
+      agentId: "mon1",
+      ...base,
+    },
+    0,
+    t,
+  );
+  assert.equal(liveAt(t, 0).subagent, 1);
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "working");
+
+  for (const ts of [200, 400, 600]) {
+    stampFromHook(
+      "%9",
+      {
+        event: ts % 400 === 0 ? "PreToolUse" : "PostToolUse",
+        agentId: "mon1",
+        toolName: "Bash",
+        ...base,
+      },
+      ts,
+      t,
+    );
+    assert.equal(
+      liveAt(t, ts).subagent,
+      1,
+      `heartbeat at t=${ts} must keep 1 subagent (beyond old 120s TTL gaps)`,
+    );
+  }
+
+  // Empty Claude Stop must not wipe the parked monitor.
+  stampFromHook(
+    "%9",
+    {
+      event: "Stop",
+      hasTasks: true,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+      shellIds: [],
+    },
+    610,
+    t,
+  );
+  assert.equal(liveAt(t, 610).subagent, 1, "empty Stop keeps mon1");
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "working");
+
+  // Authoritative drain: SubagentStop + empty inflight.
+  stampFromHook(
+    "%9",
+    {
+      event: "SubagentStop",
+      agentId: "mon1",
+      hasTasks: true,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+    },
+    620,
+    t,
+  );
+  assert.equal(liveAt(t, 620).subagent, 0);
+  // task_list host holds WORKING until idle_prompt (Claude settle path).
+  assert.equal(t.getSessOpt("s1", "@herald_host_kind"), "task_list");
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "working");
+  stampFromHook(
+    "%9",
+    {
+      event: "Notification",
+      notificationType: "idle_prompt",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+    },
+    630,
+    t,
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "done");
+});
+
+test("PostToolUse with agentId re-grants an expired subagent lease", () => {
+  // Parked monitor whose lease TTL-expired re-earns it on the next heartbeat
+  // tool call that carries agent_id (captured live 2026-07-16).
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  const ttl = 120;
+  stampFromHook(
+    "%9",
+    {
+      event: "SubagentStart",
+      agentId: "mon1",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+    },
+    0,
+    t,
+    { lease: { subagentTtlSec: ttl } },
+  );
+  assert.equal(liveAt(t, 0).subagent, 1);
+  // Quiet past expiry — no events; count decays to 0.
+  assert.equal(liveAt(t, ttl + 1).subagent, 0);
+  stampFromHook(
+    "%9",
+    {
+      event: "PostToolUse",
+      agentId: "mon1",
+      toolName: "Bash",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+    },
+    ttl + 50,
+    t,
+    { lease: { subagentTtlSec: ttl } },
+  );
+  assert.equal(liveAt(t, ttl + 50).subagent, 1);
+  const leases = parseLeases(t.getSessOpt("s1", "@herald_leases"));
+  const mon = leases.find((l) => l.kind === "subagent" && l.id === "mon1");
+  assert.ok(mon, "subagent:mon1 lease must exist");
+  assert.equal(mon.exp, ttl + 50 + ttl);
+});
+
+test("PreToolUse without agentId grants no subagent lease", () => {
+  // Main-agent tool call must not invent a subagent.
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  stampFromHook(
+    "%9",
+    {
+      event: "PreToolUse",
+      agentId: "",
+      toolName: "Bash",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+    },
+    1000,
+    t,
+  );
+  assert.equal(liveAt(t, 1000).subagent, 0);
+});
+
+test("SubagentStop does not resurrect the stopping agent", () => {
+  // SubagentStop for mon1 (which also carries agentId) must still end with
+  // no live subagent:mon1 lease — release wins over any agentId side path.
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  stampFromHook(
+    "%9",
+    {
+      event: "SubagentStart",
+      agentId: "mon1",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+    },
+    1000,
+    t,
+  );
+  assert.equal(liveAt(t, 1000).subagent, 1);
+  stampFromHook(
+    "%9",
+    {
+      event: "SubagentStop",
+      agentId: "mon1",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+    },
+    1100,
+    t,
+  );
+  assert.equal(liveAt(t, 1100).subagent, 0);
+  const leases = parseLeases(t.getSessOpt("s1", "@herald_leases"));
+  assert.equal(
+    leases.some((l) => l.kind === "subagent" && l.id === "mon1"),
+    false,
+  );
 });
 
 test("pid backstop: dead agent process forces DONE despite fresh leases", async () => {

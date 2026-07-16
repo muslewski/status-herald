@@ -29,8 +29,8 @@ test("grant + serialize + parse round-trips", () => {
 test("expired leases stop counting without any event", () => {
   const l = grant([], "subagent", "syn-1", 1000, {});
   assert.equal(countLive(l, 1060).subagent, 1);
-  assert.equal(countLive(l, 1000 + 121).subagent, 0); // TTL 120 elapsed
-  assert.equal(hasLive(l, 1200), false);
+  assert.equal(countLive(l, 1000 + 301).subagent, 0); // TTL 300 elapsed
+  assert.equal(hasLive(l, 1400), false);
 });
 
 test("watcher lease expires after its own TTL (RC2 bound)", () => {
@@ -52,13 +52,13 @@ test("grant refreshes exp idempotently; release removes; touch re-arms live only
   let l = grant([], "subagent", "a", 1000, {});
   l = grant(l, "subagent", "a", 1100, {});
   assert.equal(l.length, 1);
-  assert.equal(l[0].exp, 1100 + 120);
+  assert.equal(l[0].exp, 1100 + LEASE_DEFAULTS.subagentTtlSec);
   l = grant(l, "bg_shell", "s", 1100, {});
   l = release(l, "bg_shell", "s");
   assert.equal(countLive(l, 1100).bg_shell, 0);
   // expired lease not resurrected by touch
-  l = touch(l, 1100 + 121, {});
-  assert.equal(hasLive(l, 1100 + 121), false);
+  l = touch(l, 1100 + LEASE_DEFAULTS.subagentTtlSec + 1, {});
+  assert.equal(hasLive(l, 1100 + LEASE_DEFAULTS.subagentTtlSec + 1), false);
 });
 
 test("touch with kinds re-arms only listed kinds", () => {
@@ -95,7 +95,7 @@ test("cfg overrides TTLs", () => {
 test("pruneExpired drops only expired", () => {
   let l = grant([], "subagent", "a", 1000, {});
   l = grant(l, "watcher", "w", 1000, {});
-  const pruned = pruneExpired(l, 1000 + 121);
+  const pruned = pruneExpired(l, 1000 + LEASE_DEFAULTS.subagentTtlSec + 1);
   assert.equal(pruned.length, 1);
   assert.equal(pruned[0].kind, "watcher");
 });

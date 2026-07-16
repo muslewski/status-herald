@@ -126,7 +126,7 @@ If cards look double-glitched or CPU spikes after many refreshes, check for orph
 - **Stale DONE while thinking:** Grok often has no event mid-reason until a tool. We wire **PreToolUse** → WORKING, and treat **task-complete system injects** as WORKING. Re-run `herald curtain install` + `herald curtain install grok` after upgrade.
 - **Bar wash:** **off by default** so `@ctxbar` context stays visible. Optional sliding line only if `curtain.tmuxBar.wash: true`. Grok context window is **500k** (not Claude 1M).
 - **Synthetic UserPromptSubmit** does **not** re-assert WORKING after DONE.
-- **Quiet/leak settle:** card loop runs `herald curtain settle` each tick and stamps `@herald_settle_ts`. Synthesis/hybrid quiet → DONE after `curtain.settle.settleSynthQuietSec` (90s). Leaked subagent leases clear after `settleSynthLeakSec` (180s) or their own TTL (`curtain.lease.subagentTtlSec` 120s). Task-list hosts are not quiet-settled. Dead agent PID → DONE (`isPidAlive`). Run `herald doctor` for settle-health / RC3.
+- **Quiet/leak settle:** card loop runs `herald curtain settle` each tick and stamps `@herald_settle_ts`. Synthesis/hybrid quiet → DONE after `curtain.settle.settleSynthQuietSec` (90s). Leaked subagent leases clear after `settleSynthLeakSec` (360s) or their own TTL (`curtain.lease.subagentTtlSec` 300s). Task-list hosts are not quiet-settled. Dead agent PID → DONE (`isPidAlive`). Run `herald doctor` for settle-health / RC3.
 - Stuck WORKING with leftover `syn-*` ids: SubagentStop mismatch drops a `syn-*`; else wait for lease TTL / leak settle / next human prompt / `disarm && arm`.
 
 ## Config
@@ -135,12 +135,12 @@ See README "Config reference". Curtain works the same regardless of agent.
 
 | Path | Default | Meaning |
 |------|---------|---------|
-| `curtain.lease.subagentTtlSec` | 120 | Subagent lease TTL (sec) |
+| `curtain.lease.subagentTtlSec` | 300 | Subagent lease TTL (sec) |
 | `curtain.lease.watcherTtlSec` | 900 | Watcher/loop lease TTL |
-| `curtain.lease.bgShellTtlSec` | 120 | Bg shell lease TTL |
+| `curtain.lease.bgShellTtlSec` | 300 | Bg shell lease TTL |
 | `curtain.lease.turnTtlSec` | 120 | Turn activity lease TTL |
 | `curtain.settle.settleSynthQuietSec` | 90 | Quiet → DONE (synthesis/hybrid) |
-| `curtain.settle.settleSynthLeakSec` | 180 | Leak clear for leftover subagents |
+| `curtain.settle.settleSynthLeakSec` | 360 | Leak clear for leftover subagents |
 | `curtain.settle.maxWorkingSec` | 0 | Absolute WORKING ceiling (0=off) |
 | `curtain.settle.maxNeedsSec` | 0 | Abandoned NEEDS (0=off) |
 | `curtain.lines.model` | false | Optional model@effort info line |
