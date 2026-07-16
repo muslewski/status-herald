@@ -1010,6 +1010,56 @@ test("fake-clock: subagent lease expires without further events (TTL)", () => {
   assert.equal(liveAt(t, 1000 + 121).subagent, 0);
 });
 
+test("immortal-watcher repro: Monitor + busy session + Stop → DONE; watcher exp never re-armed", () => {
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  const base = {
+    hasTasks: false,
+    subagents: 0,
+    shells: 0,
+    subagentIds: [],
+    toolBackground: false,
+    loopPrompt: false,
+  };
+  // t=0: grant watcher:mon via Monitor PreToolUse
+  stampFromHook(
+    "%9",
+    { event: "PreToolUse", toolName: "monitor", ...base },
+    0,
+    t,
+  );
+  const monExpAtGrant = parseLeases(t.getSessOpt("s1", "@herald_leases")).find(
+    (l) => l.id === "mon",
+  )?.exp;
+  assert.equal(monExpAtGrant, 0 + 900);
+
+  // Busy session: activity must not re-arm the watcher
+  for (const ts of [60, 120, 180]) {
+    stampFromHook(
+      "%9",
+      { event: "PostToolUse", toolName: "Read", ...base },
+      ts,
+      t,
+    );
+  }
+
+  // t=200: Stop with no tasks → DONE; watcher exp still grant-time
+  stampFromHook("%9", { event: "Stop", ...base, toolName: "" }, 200, t);
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "done");
+  const mon = parseLeases(t.getSessOpt("s1", "@herald_leases")).find(
+    (l) => l.id === "mon",
+  );
+  assert.equal(mon.exp, 0 + 900, "watcher exp never re-armed by activity");
+
+  // t=901: watcher TTL elapsed → countLive reports 0 watchers
+  // applySettle may clear leases on quiet settle; also assert pure countLive.
+  assert.equal(liveAt(t, 901).watcher, 0);
+  applySettle("s1", 901, t, {
+    settle: { settleSynthQuietSec: 90 },
+  });
+  assert.equal(liveAt(t, 901).watcher, 0);
+});
+
 test("PostToolUse does not extend watcher exp; does re-arm subagent", () => {
   const t = makeT(freshSession());
   t.sessionOf = () => "s1";
