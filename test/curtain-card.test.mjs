@@ -249,9 +249,15 @@ test("forge framed card: anvil divider shares center with label and figure", () 
     ["done", 99, /\bDONE\b/],
     ["needs", 0, /NEEDS YOU/],
   ]) {
-    const lines = renderCard(state, 0, cols, 24, { worked: 90 }, BUILTINS.forge, tick).map(
-      plain,
-    );
+    const lines = renderCard(
+      state,
+      0,
+      cols,
+      24,
+      { worked: 90 },
+      BUILTINS.forge,
+      tick,
+    ).map(plain);
     const anvil = lines.find((l) => /={3,}/.test(l));
     const label = lines.find((l) => labelRe.test(l));
     assert.ok(anvil && label, `${state}: anvil + label`);

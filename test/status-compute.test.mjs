@@ -172,7 +172,11 @@ test("contextFromGrokSignals prefers live _meta.totalTokens over stale signals",
 
 test("contextFromGrokSignals does not regress below signals when live is lower", () => {
   const c = contextFromGrokSignals(
-    { contextTokensUsed: 200000, contextWindowTokens: 500000, userMessageCount: 3 },
+    {
+      contextTokensUsed: 200000,
+      contextWindowTokens: 500000,
+      userMessageCount: 3,
+    },
     150000,
   );
   assert.equal(c.used, 200000);
@@ -184,7 +188,10 @@ test("latestGrokMetaTotalTokens reads _meta only, ignores cumulative usage", asy
     // Cumulative API usage must NOT win over live context meta.
     const lines = [
       JSON.stringify({
-        params: { _meta: { totalTokens: 90000 }, update: { sessionUpdate: "tool_call" } },
+        params: {
+          _meta: { totalTokens: 90000 },
+          update: { sessionUpdate: "tool_call" },
+        },
       }),
       JSON.stringify({
         params: {
@@ -195,10 +202,16 @@ test("latestGrokMetaTotalTokens reads _meta only, ignores cumulative usage", asy
         },
       }),
       JSON.stringify({
-        params: { _meta: { totalTokens: 128966 }, update: { sessionUpdate: "tool_call_update" } },
+        params: {
+          _meta: { totalTokens: 128966 },
+          update: { sessionUpdate: "tool_call_update" },
+        },
       }),
     ];
-    await fs.writeFile(path.join(dir, "updates.jsonl"), lines.join("\n") + "\n");
+    await fs.writeFile(
+      path.join(dir, "updates.jsonl"),
+      `${lines.join("\n")}\n`,
+    );
     assert.equal(latestGrokMetaTotalTokens(dir), 128966);
   });
 });
@@ -228,7 +241,7 @@ test("discoverLiveGrokSessions prefers live updates totalTokens over stale signa
     );
     await fs.writeFile(
       path.join(sessDir, "updates.jsonl"),
-      JSON.stringify({ params: { _meta: { totalTokens: 150000 } } }) + "\n",
+      `${JSON.stringify({ params: { _meta: { totalTokens: 150000 } } })}\n`,
     );
     await fs.writeFile(
       path.join(sessDir, "summary.json"),
