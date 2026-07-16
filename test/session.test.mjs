@@ -1759,6 +1759,101 @@ test("Grok Stop (no tasks) still reconciles subagents to empty", () => {
   assert.equal(t.getSessOpt("s1", "@herald_state"), "done");
 });
 
+test("monitor-sandwich lifecycle: heartbeats heal past old TTL; empty Stop keeps fleet; SubagentStop settles", () => {
+  // Live repro lock: SubagentStart → quiet gaps beyond old 120s TTL → heartbeat
+  // Pre/PostToolUse with agentId re-grants → empty Claude Stop does not wipe →
+  // SubagentStop with empty inflight drains → idle_prompt reaches DONE.
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  const base = {
+    hasTasks: false,
+    subagents: 0,
+    shells: 0,
+    subagentIds: [],
+  };
+  stampFromHook(
+    "%9",
+    {
+      event: "SubagentStart",
+      agentId: "mon1",
+      ...base,
+    },
+    0,
+    t,
+  );
+  assert.equal(liveAt(t, 0).subagent, 1);
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "working");
+
+  for (const ts of [200, 400, 600]) {
+    stampFromHook(
+      "%9",
+      {
+        event: ts % 400 === 0 ? "PreToolUse" : "PostToolUse",
+        agentId: "mon1",
+        toolName: "Bash",
+        ...base,
+      },
+      ts,
+      t,
+    );
+    assert.equal(
+      liveAt(t, ts).subagent,
+      1,
+      `heartbeat at t=${ts} must keep 1 subagent (beyond old 120s TTL gaps)`,
+    );
+  }
+
+  // Empty Claude Stop must not wipe the parked monitor.
+  stampFromHook(
+    "%9",
+    {
+      event: "Stop",
+      hasTasks: true,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+      shellIds: [],
+    },
+    610,
+    t,
+  );
+  assert.equal(liveAt(t, 610).subagent, 1, "empty Stop keeps mon1");
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "working");
+
+  // Authoritative drain: SubagentStop + empty inflight.
+  stampFromHook(
+    "%9",
+    {
+      event: "SubagentStop",
+      agentId: "mon1",
+      hasTasks: true,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+    },
+    620,
+    t,
+  );
+  assert.equal(liveAt(t, 620).subagent, 0);
+  // task_list host holds WORKING until idle_prompt (Claude settle path).
+  assert.equal(t.getSessOpt("s1", "@herald_host_kind"), "task_list");
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "working");
+  stampFromHook(
+    "%9",
+    {
+      event: "Notification",
+      notificationType: "idle_prompt",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+    },
+    630,
+    t,
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "done");
+});
+
 test("PostToolUse with agentId re-grants an expired subagent lease", () => {
   // Parked monitor whose lease TTL-expired re-earns it on the next heartbeat
   // tool call that carries agent_id (captured live 2026-07-16).
