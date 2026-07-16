@@ -127,3 +127,66 @@ test("pid extracted from payload when present", () => {
   });
   assert.equal(ev.pid, 4242);
 });
+
+test("claude Monitor PostToolUse extracts toolTaskId from tool_response.taskId", () => {
+  const ev = normalizePayload({
+    hook_event_name: "PostToolUse",
+    tool_name: "Monitor",
+    tool_input: {
+      description: "debt-fleet child completions",
+      persistent: true,
+      timeout_ms: 3600000,
+      command: "while true; do sleep 60; done",
+    },
+    tool_response: { taskId: "bdxck8yos", timeoutMs: 0, persistent: true },
+  });
+  assert.equal(ev.event, "PostToolUse");
+  assert.equal(ev.toolName, "Monitor");
+  assert.equal(ev.toolTaskId, "bdxck8yos");
+});
+
+test("claude Bash background PostToolUse extracts toolTaskId from backgroundTaskId", () => {
+  const ev = normalizePayload({
+    hook_event_name: "PostToolUse",
+    tool_name: "Bash",
+    tool_input: {
+      command: "sleep 999",
+      description: "bg shell",
+      run_in_background: true,
+    },
+    tool_response: {
+      stdout: "",
+      stderr: "",
+      interrupted: false,
+      backgroundTaskId: "b1ik7ojoi",
+    },
+  });
+  assert.equal(ev.toolBackground, true);
+  assert.equal(ev.toolTaskId, "b1ik7ojoi");
+});
+
+test("claude background_tasks type monitor is not counted as shell", () => {
+  const ev = normalizePayload({
+    hook_event_name: "Stop",
+    background_tasks: [
+      { id: "s1", type: "shell", status: "running", description: "build" },
+      {
+        id: "m1",
+        type: "monitor",
+        status: "running",
+        description: "watch child",
+      },
+      {
+        id: "m2",
+        type: "shell",
+        status: "running",
+        description: "poll worktree",
+        // still shell-typed — only explicit type:monitor splits here
+      },
+    ],
+  });
+  assert.deepEqual(ev.shellIds, ["s1", "m2"]);
+  assert.deepEqual(ev.monitorIds, ["m1"]);
+  assert.equal(ev.shells, 2);
+  assert.equal(ev.monitors, 1);
+});

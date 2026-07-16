@@ -2188,3 +2188,134 @@ test("pid backstop: dead agent process forces DONE despite fresh leases", async 
   assert.equal(t.getSessOpt("s1", "@herald_state"), "done");
   assert.equal(t.getSessOpt("s1", "@herald_leases"), "");
 });
+
+// Live bug 2026-07-17 (syndcast session): Claude status bar reports
+// "3 shells, 5 monitors" but the curtain showed "1 watcher 8 tasks".
+// Root cause: every background_tasks type:"shell" became bg_shell/task,
+// while Monitor PreToolUse granted a single placeholder watcher:mon —
+// monitors never received their own taskId leases, so 3+5 collapsed to 1+8.
+test("Claude 3 shells + 5 monitors do not collapse to 1 watcher + 8 tasks", () => {
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  const base = {
+    sourceCli: "claude",
+    hasTasks: false,
+    subagents: 0,
+    shells: 0,
+    subagentIds: [],
+    shellIds: [],
+    monitorIds: [],
+    toolBackground: false,
+    loopPrompt: false,
+  };
+
+  // Five Claude Monitor tools: PostToolUse returns tool_response.taskId.
+  // Captured live: { taskId: 'bdxck8yos', timeoutMs: 0, persistent: true }.
+  const monitors = [
+    "bnw2gu5zb",
+    "bnl2zel1e",
+    "bfqagi33b",
+    "bn3692luu",
+    "bdxck8yos",
+  ];
+  let ts = 1000;
+  for (const id of monitors) {
+    stampFromHook(
+      "%9",
+      {
+        ...base,
+        event: "PreToolUse",
+        toolName: "Monitor",
+      },
+      ts++,
+      t,
+    );
+    stampFromHook(
+      "%9",
+      {
+        ...base,
+        event: "PostToolUse",
+        toolName: "Monitor",
+        toolTaskId: id,
+      },
+      ts++,
+      t,
+    );
+  }
+
+  // Three Bash run_in_background shells: tool_response.backgroundTaskId.
+  const shells = ["b1ik7ojoi", "b0luc4n2t", "bc0fpiviv"];
+  for (const id of shells) {
+    stampFromHook(
+      "%9",
+      {
+        ...base,
+        event: "PostToolUse",
+        toolName: "Bash",
+        toolBackground: true,
+        toolTaskId: id,
+      },
+      ts++,
+      t,
+    );
+  }
+
+  // Authoritative Stop: Claude still types monitors as type:"shell" in
+  // background_tasks (measured in hook-debug — only shell|subagent). The
+  // lease store must keep the 5 monitor taskIds as watchers and only the
+  // 3 pure shells as bg_shell.
+  const allShellTyped = [...shells, ...monitors].map((id) => ({
+    id,
+    type: "shell",
+    status: "running",
+    description: id,
+  }));
+  stampFromHook(
+    "%9",
+    {
+      ...base,
+      event: "Stop",
+      hasTasks: true,
+      shells: allShellTyped.length,
+      shellIds: allShellTyped.map((x) => x.id),
+      // Adapter would set monitorIds from prior knowledge / type; stamp path
+      // relies on existing watcher leases for shell-typed monitors.
+      monitorIds: [],
+      subagents: 0,
+      subagentIds: [],
+    },
+    ts,
+    t,
+  );
+
+  const live = liveAt(t, ts);
+  assert.equal(
+    live.bg_shell,
+    3,
+    "pure Bash background shells must remain shells, not lump monitors",
+  );
+  assert.equal(
+    live.watcher,
+    5,
+    "each Monitor taskId is its own watcher/monitor lease (not a single mon)",
+  );
+  assert.equal(live.subagent, 0);
+  // Placeholder watcher:mon must not survive once real taskIds are known.
+  assert.doesNotMatch(
+    t.getSessOpt("s1", "@herald_leases"),
+    /watcher:mon:/,
+    "provisional mon placeholder must be released after taskId grants",
+  );
+  for (const id of monitors) {
+    assert.match(
+      t.getSessOpt("s1", "@herald_leases"),
+      new RegExp(`watcher:${id}:`),
+    );
+  }
+  for (const id of shells) {
+    assert.match(
+      t.getSessOpt("s1", "@herald_leases"),
+      new RegExp(`bg_shell:${id}:`),
+    );
+  }
+});
