@@ -90,3 +90,27 @@ test("card loop resets tick when herald state changes (settleAfter relative to e
     "tick reset after state read and before render",
   );
 });
+
+// Act I: stage-curtain draw rides the existing tick loop (no new event loop).
+test("card loop reads @herald_draw and passes --draw/--draw-tick to render", () => {
+  assert.match(script, /@herald_draw/, "reads draw phase");
+  assert.match(script, /--draw/, "forwards draw direction");
+  assert.match(script, /--draw-tick/, "forwards draw progress tick");
+  assert.match(script, /@herald_draw_ms|draw_ms/, "draw burst cadence");
+  assert.match(script, /@herald_draw_frames|draw_frames/, "draw frame count");
+});
+
+test("card loop uses draw_ms pace during shut/open (≤ ~600ms full draw)", () => {
+  assert.match(
+    script,
+    /draw.*=.*shut|draw_ms/,
+    "draw phase branches for pace",
+  );
+  // When drawing, ms comes from draw_ms not the slow uncovered 1s path alone.
+  assert.match(script, /ms=\$\{draw_ms/);
+});
+
+test("card loop keypress starts open theatrics on non-classic before reveal", () => {
+  assert.match(script, /@herald_draw open|herald_draw open/, "open phase");
+  assert.match(script, /theme.*classic|classic.*theme/, "classic gate");
+});

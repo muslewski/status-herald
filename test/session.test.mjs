@@ -1762,6 +1762,52 @@ test("arm stamps an animated theme's faster frame interval", () => {
   assert.equal(t.getSessOpt("s1", "@herald_frame_ms"), "500", "2 fps default");
 });
 
+test("cover stamps stage-curtain shut for forge; classic stays undrawn", () => {
+  const forgeT = makeT(freshSession());
+  arm("s1", forgeT, {
+    theme: "forge",
+    animation: { enabled: true, fps: 2, drawFrames: 8, drawMs: 600 },
+  });
+  forgeT.setSessOpt("s1", "@herald_state", "working");
+  cover("s1", forgeT, {
+    theme: "forge",
+    animation: { enabled: true, fps: 2, drawFrames: 8, drawMs: 600 },
+  });
+  assert.equal(forgeT.getSessOpt("s1", "@herald_draw"), "shut");
+  assert.equal(forgeT.getSessOpt("s1", "@herald_covered"), "1");
+
+  const classicT = makeT(freshSession());
+  arm("s1", classicT, { theme: "classic" });
+  classicT.setSessOpt("s1", "@herald_state", "working");
+  cover("s1", classicT, { theme: "classic", animation: { enabled: true } });
+  assert.equal(
+    classicT.getSessOpt("s1", "@herald_draw"),
+    "",
+    "classic is static baseline",
+  );
+});
+
+test("reveal clears draw phase and uncovers", () => {
+  const t = makeT(freshSession());
+  arm("s1", t, { theme: "forge", animation: { enabled: true } });
+  t.setSessOpt("s1", "@herald_state", "working");
+  cover("s1", t, { theme: "forge", animation: { enabled: true } });
+  assert.equal(t.getSessOpt("s1", "@herald_draw"), "shut");
+  reveal("s1", t, { theme: "forge", animation: { enabled: true } });
+  assert.equal(t.getSessOpt("s1", "@herald_covered"), "0");
+  assert.equal(t.getSessOpt("s1", "@herald_draw"), "");
+});
+
+test("arm stamps draw_ms and draw_frames for stage-curtain budget", () => {
+  const t = makeT(freshSession());
+  arm("s1", t, {
+    theme: "forge",
+    animation: { enabled: true, fps: 2, drawFrames: 8, drawMs: 600 },
+  });
+  assert.equal(t.getSessOpt("s1", "@herald_draw_ms"), "75");
+  assert.equal(t.getSessOpt("s1", "@herald_draw_frames"), "8");
+});
+
 test("arm honors a themeBySession glob over the global default", () => {
   const t = makeT(freshSession());
   arm("s1", t, { theme: "classic", themeBySession: { "s*": "forge" } });
