@@ -61,6 +61,25 @@ test("grant refreshes exp idempotently; release removes; touch re-arms live only
   assert.equal(hasLive(l, 1100 + 121), false);
 });
 
+test("touch with kinds re-arms only listed kinds", () => {
+  const now = 1000;
+  const leases = [
+    { kind: "watcher", id: "mon", exp: 1100 },
+    { kind: "subagent", id: "s1", exp: 1050 },
+  ];
+  const out = touch(leases, now, {}, ["subagent"]);
+  const mon = out.find((l) => l.id === "mon");
+  const s1 = out.find((l) => l.id === "s1");
+  assert.equal(mon.exp, 1100); // untouched
+  assert.equal(s1.exp, now + LEASE_DEFAULTS.subagentTtlSec);
+});
+
+test("touch with kinds still drops expired leases of any kind", () => {
+  const now = 1000;
+  const leases = [{ kind: "watcher", id: "mon", exp: 999 }];
+  assert.deepEqual(touch(leases, now, {}, ["subagent"]), []);
+});
+
 test("parse tolerates garbage and id sanitization strips separators", () => {
   assert.deepEqual(parseLeases("bogus,,subagent:x:notanum,:::"), []);
   const l = grant([], "subagent", "a,b:c", 1000, {});
