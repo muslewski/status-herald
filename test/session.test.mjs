@@ -1402,3 +1402,65 @@ test("arm honors a themeBySession glob over the global default", () => {
   arm("s1", t, { theme: "classic", themeBySession: { "s*": "forge" } });
   assert.equal(t.getSessOpt("s1", "@herald_theme"), "forge");
 });
+
+test("SessionEnd stamps DONE and clears all leases", () => {
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  stampFromHook(
+    "%9",
+    {
+      event: "SubagentStart",
+      agentId: "a",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+    },
+    1000,
+    t,
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "working");
+  assert.ok(liveAt(t).subagent >= 1);
+  stampFromHook(
+    "%9",
+    {
+      event: "SessionEnd",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+    },
+    1100,
+    t,
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "done");
+  assert.equal(t.getSessOpt("s1", "@herald_leases"), "");
+});
+
+test("pid backstop: dead agent process forces DONE despite fresh leases", async () => {
+  const { spawn } = await import("node:child_process");
+  const { once } = await import("node:events");
+  const child = spawn(process.execPath, ["-e", "setInterval(()=>{},1000)"], {
+    stdio: "ignore",
+  });
+  const t = makeT(freshSession());
+  arm("s1", t);
+  t.setSessOpt("s1", "@herald_state", "working");
+  t.setSessOpt(
+    "s1",
+    "@herald_leases",
+    `subagent:alive:${Math.floor(Date.now() / 1000) + 600}`,
+  );
+  t.setSessOpt("s1", "@herald_agent_pid", String(child.pid));
+  t.setSessOpt("s1", "@herald_last_active", "1000");
+  t.setSessOpt("s1", "@herald_since", "900");
+  t.setSessOpt("s1", "@herald_host_kind", "synthesis");
+  // Still alive → settle should not PID-kill
+  assert.equal(applySettle("s1", 1000, t, { settle: {} }), false);
+  child.kill("SIGKILL");
+  await once(child, "exit");
+  const ok = applySettle("s1", 1001, t, { settle: {} });
+  assert.equal(ok, true);
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "done");
+  assert.equal(t.getSessOpt("s1", "@herald_leases"), "");
+});
