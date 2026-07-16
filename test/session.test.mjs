@@ -18,6 +18,7 @@ import {
   stampFromHook,
   stampSession,
 } from "../lib/curtain/session.mjs";
+import { settleIfStale } from "../lib/curtain/settle.mjs";
 
 /** Live lease counts at nowSec (default far-future so tests see granted leases). */
 const liveAt = (t, nowSec = 0, sess = "s1") =>
@@ -861,6 +862,101 @@ test("shouldSettleSynthSubagentStop pure helper", () => {
     }),
     false,
   );
+});
+
+// P8 hermes flash lock: Claude mid-turn with a drained subagent must not
+// DONE-flash via hybrid demotion + SubagentStop settle or quiet settle.
+// Live bug 2026-07-16: task_list demoted on bt-less SubagentStart → hybrid
+// → shouldSettleSynthSubagentStop / quiet settle while CLI still thinking.
+test("hermes mid-turn DONE-flash cannot recur (task_list + Claude)", () => {
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  t.setSessOpt("s1", "@herald_host_kind", "task_list");
+  t.setSessOpt("s1", "@herald_state", "working");
+  t.setSessOpt("s1", "@herald_since", "0");
+  t.setSessOpt("s1", "@herald_last_active", "0");
+
+  // (a) Claude SubagentStart without background_tasks — stay task_list.
+  stampFromHook(
+    "%9",
+    {
+      event: "SubagentStart",
+      agentId: "lane1",
+      sourceCli: "claude",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+    },
+    0,
+    t,
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_host_kind"), "task_list");
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "working");
+  assert.equal(liveAt(t, 0).subagent, 1);
+
+  // (b) SubagentStop drains fleet; task_list must NOT synth-settle to DONE.
+  stampFromHook(
+    "%9",
+    {
+      event: "SubagentStop",
+      agentId: "lane1",
+      sourceCli: "claude",
+      hasTasks: true,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+    },
+    30,
+    t,
+  );
+  assert.equal(liveAt(t, 30).subagent, 0);
+  assert.equal(
+    t.getSessOpt("s1", "@herald_state"),
+    "working",
+    "shouldSettleSynthSubagentStop must not fire on task_list",
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_host_kind"), "task_list");
+
+  // (c) Long silence past turn TTL + old 90s quiet: task_list quiet path is null.
+  const quietSnap = {
+    state: "working",
+    hostKind: "task_list",
+    lastActive: 30,
+    since: 0,
+    counts: { subagent: 0, watcher: 0, bg_shell: 0, turn: 0 },
+    agentAlive: null,
+  };
+  assert.equal(
+    settleIfStale(quietSnap, 400, { settleSynthQuietSec: 300 }),
+    null,
+    "task_list must not quiet-settle after 370s silence",
+  );
+  assert.equal(
+    applySettle("s1", 400, t, {
+      settle: { settleSynthQuietSec: 300, maxWorkingSec: 0 },
+    }),
+    false,
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "working");
+
+  // (d) Genuine end: Stop with empty bt → DONE (turn over).
+  stampFromHook(
+    "%9",
+    {
+      event: "Stop",
+      sourceCli: "claude",
+      hasTasks: true,
+      subagents: 0,
+      shells: 0,
+      subagentIds: [],
+      shellIds: [],
+    },
+    410,
+    t,
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "done");
+  assert.equal(t.getSessOpt("s1", "@herald_host_kind"), "task_list");
 });
 
 test("SubagentStop with mismatched id drops a syn-* id (Grok pairing)", () => {
