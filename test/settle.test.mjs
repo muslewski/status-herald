@@ -6,6 +6,25 @@ import {
   settleIfStale,
 } from "../lib/curtain/settle.mjs";
 
+const snap = (o = {}) => {
+  const { counts: countOver = {}, ...rest } = o;
+  return {
+    state: "working",
+    hostKind: "synthesis",
+    lastActive: 1000,
+    since: 900,
+    agentAlive: null,
+    ...rest,
+    counts: {
+      subagent: 0,
+      watcher: 0,
+      bg_shell: 0,
+      turn: 0,
+      ...countOver,
+    },
+  };
+};
+
 test("SETTLE_DEFAULTS are fleet-safe", () => {
   assert.equal(SETTLE_DEFAULTS.settleSynthQuietSec, 90);
   assert.equal(SETTLE_DEFAULTS.settleSynthLeakSec, 180);
@@ -37,103 +56,79 @@ test("isActiveHookEvent ignores task_complete and synthetic prompts", () => {
   );
 });
 
-test("settleIfStale: synthesis quiet WORKING+subs0 → DONE", () => {
-  assert.deepEqual(
-    settleIfStale(
-      {
-        state: "working",
-        subs: 0,
-        tasksSeen: false,
-        lastActive: 1000,
-        since: 900,
-      },
-      1090,
-      { settleSynthQuietSec: 90 },
-    ),
-    { state: "done", clearSubs: false },
-  );
+test("settleIfStale: synthesis quiet WORKING + all counts 0 → DONE", () => {
+  assert.deepEqual(settleIfStale(snap({}), 1090, { settleSynthQuietSec: 90 }), {
+    state: "done",
+    clearLeases: true,
+  });
 });
 
-test("settleIfStale: never settles while watchers (Grok loops) > 0", () => {
+test("settleIfStale: live watcher holds WORKING; expired watcher allows quiet settle (RC2)", () => {
+  // Watcher lease still live → null even if quiet > 90
   assert.equal(
+    settleIfStale(snap({ counts: { watcher: 1 }, lastActive: 1000 }), 1400, {
+      settleSynthQuietSec: 90,
+    }),
+    null,
+  );
+  // Watcher expired (count already 0 at call site) + quiet ≥ 90 → DONE
+  assert.deepEqual(
     settleIfStale(
-      {
-        state: "working",
-        subs: 0,
-        watchers: 1,
-        tasksSeen: false,
-        lastActive: 1000,
-        since: 900,
-      },
-      9999,
+      snap({ counts: { watcher: 0 }, lastActive: 1000 }),
+      1000 + 901,
       { settleSynthQuietSec: 90 },
     ),
-    null,
+    { state: "done", clearLeases: true },
   );
 });
 
 test("settleIfStale: task_complete-hot last_hook would not matter — uses lastActive", () => {
-  // Quiet only 10s on lastActive → no settle even if "hook spam"
   assert.equal(
-    settleIfStale(
-      {
-        state: "working",
-        subs: 0,
-        tasksSeen: false,
-        lastActive: 1000,
-        since: 900,
-      },
-      1010,
-      { settleSynthQuietSec: 90 },
-    ),
+    settleIfStale(snap({ lastActive: 1000 }), 1010, {
+      settleSynthQuietSec: 90,
+    }),
     null,
   );
 });
 
-test("settleIfStale: Claude tasks_seen does not quiet-settle", () => {
+test("settleIfStale: task_list host does not quiet-settle", () => {
   assert.equal(
-    settleIfStale(
-      {
-        state: "working",
-        subs: 0,
-        tasksSeen: true,
-        lastActive: 1000,
-        since: 900,
-      },
-      2000,
-      { settleSynthQuietSec: 90, maxWorkingSec: 0 },
-    ),
+    settleIfStale(snap({ hostKind: "task_list", lastActive: 1000 }), 2000, {
+      settleSynthQuietSec: 90,
+      maxWorkingSec: 0,
+    }),
     null,
   );
 });
 
-test("settleIfStale: synthesis leak clears subs after settleSynthLeakSec", () => {
+test("settleIfStale: hybrid host quiet-settles like synthesis", () => {
+  assert.deepEqual(
+    settleIfStale(snap({ hostKind: "hybrid", lastActive: 1000 }), 1090, {
+      settleSynthQuietSec: 90,
+    }),
+    { state: "done", clearLeases: true },
+  );
+});
+
+test("settleIfStale: synthesis leak clears leases after settleSynthLeakSec", () => {
   assert.deepEqual(
     settleIfStale(
-      {
-        state: "working",
-        subs: 3,
-        tasksSeen: false,
-        lastActive: 1000,
-        since: 900,
-      },
+      snap({ counts: { subagent: 3 }, lastActive: 1000 }),
       1000 + 180,
       { settleSynthLeakSec: 180 },
     ),
-    { state: "done", clearSubs: true },
+    { state: "done", clearLeases: true },
   );
 });
 
-test("settleIfStale: never leak-settles Claude tasks_seen with subs", () => {
+test("settleIfStale: never leak-settles task_list with subagents", () => {
   assert.equal(
     settleIfStale(
-      {
-        state: "working",
-        subs: 2,
-        tasksSeen: true,
+      snap({
+        hostKind: "task_list",
+        counts: { subagent: 2 },
         lastActive: 1000,
-        since: 900,
-      },
+      }),
       9999,
       { settleSynthLeakSec: 1 },
     ),
@@ -141,33 +136,21 @@ test("settleIfStale: never leak-settles Claude tasks_seen with subs", () => {
   );
 });
 
-test("settleIfStale: maxWorkingSec can settle Claude WORKING+subs0 when enabled", () => {
+test("settleIfStale: maxWorkingSec can settle task_list WORKING when enabled", () => {
   assert.deepEqual(
     settleIfStale(
-      {
-        state: "working",
-        subs: 0,
-        tasksSeen: true,
-        lastActive: 1000,
-        since: 1000,
-      },
+      snap({ hostKind: "task_list", lastActive: 1000, since: 1000 }),
       1000 + 3600,
       { maxWorkingSec: 3600 },
     ),
-    { state: "done", clearSubs: false },
+    { state: "done", clearLeases: true },
   );
 });
 
 test("settleIfStale: maxNeedsSec off by default", () => {
   assert.equal(
     settleIfStale(
-      {
-        state: "needs",
-        subs: 0,
-        tasksSeen: false,
-        lastActive: 1000,
-        since: 1000,
-      },
+      snap({ state: "needs", lastActive: 1000, since: 1000 }),
       1000 + 99999,
       {},
     ),
@@ -178,16 +161,51 @@ test("settleIfStale: maxNeedsSec off by default", () => {
 test("settleIfStale: maxNeedsSec can clear abandoned NEEDS when enabled", () => {
   assert.deepEqual(
     settleIfStale(
-      {
-        state: "needs",
-        subs: 0,
-        tasksSeen: false,
-        lastActive: 1000,
-        since: 1000,
-      },
+      snap({ state: "needs", lastActive: 1000, since: 1000 }),
       1000 + 3600,
       { maxNeedsSec: 3600 },
     ),
-    { state: "done", clearSubs: true },
+    { state: "done", clearLeases: true },
+  );
+});
+
+test("settleIfStale: PID backstop forces DONE when agentAlive is false", () => {
+  assert.deepEqual(
+    settleIfStale(
+      snap({
+        state: "working",
+        counts: { subagent: 2, turn: 1 },
+        agentAlive: false,
+      }),
+      1000,
+      {},
+    ),
+    { state: "done", clearLeases: true },
+  );
+  // unknown → skip
+  assert.equal(
+    settleIfStale(
+      snap({ agentAlive: null, counts: { subagent: 1 } }),
+      1000,
+      {},
+    ),
+    null,
+  );
+});
+
+test("settleIfStale: lease expiry and quiet are independent (precedence)", () => {
+  // Expired subagent already not in counts; quiet 30s < 90 → null
+  assert.equal(
+    settleIfStale(snap({ counts: { subagent: 0 }, lastActive: 1000 }), 1030, {
+      settleSynthQuietSec: 90,
+    }),
+    null,
+  );
+  // quiet 91 → DONE
+  assert.deepEqual(
+    settleIfStale(snap({ counts: { subagent: 0 }, lastActive: 1000 }), 1091, {
+      settleSynthQuietSec: 90,
+    }),
+    { state: "done", clearLeases: true },
   );
 });

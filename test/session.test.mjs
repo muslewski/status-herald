@@ -815,9 +815,10 @@ test("applySettle does not settle Claude task_list during pure generation", () =
   assert.equal(t.getSessOpt("s1", "@herald_state"), "working");
 });
 
-test("Grok /loop: Stop stays WORKING while watchers > 0", () => {
+test("Grok /loop: Stop stays WORKING while watchers live; settle after TTL+quiet", () => {
   const t = makeT(freshSession());
   t.sessionOf = () => "s1";
+  const leaseCfg = { watcherTtlSec: 60 };
   stampFromHook(
     "%9",
     {
@@ -833,8 +834,9 @@ test("Grok /loop: Stop stays WORKING while watchers > 0", () => {
     },
     1000,
     t,
+    { lease: leaseCfg, settle: { settleSynthQuietSec: 90 } },
   );
-  assert.equal(liveAt(t).watcher, 1);
+  assert.equal(liveAt(t, 1000).watcher, 1);
   assert.equal(t.getSessOpt("s1", "@herald_state"), "working");
   stampFromHook(
     "%9",
@@ -850,13 +852,21 @@ test("Grok /loop: Stop stays WORKING while watchers > 0", () => {
     },
     1010,
     t,
+    { lease: leaseCfg, settle: { settleSynthQuietSec: 90 } },
   );
   assert.equal(
     t.getSessOpt("s1", "@herald_state"),
     "working",
     "must not DONE while /loop is watching",
   );
-  assert.equal(liveAt(t).watcher, 1);
+  assert.equal(liveAt(t, 1010).watcher, 1);
+  // Past watcher TTL (60) + quiet ≥ 90 from last_active 1010 → settle DONE
+  const ok = applySettle("s1", 1010 + 91, t, {
+    lease: leaseCfg,
+    settle: { settleSynthQuietSec: 90 },
+  });
+  assert.equal(ok, true);
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "done");
 });
 
 test("/loop prompt + scheduler_create is ONE watcher not two", () => {
