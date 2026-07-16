@@ -62,38 +62,79 @@ from SubagentStart/Stop if no background_tasks present).
 ### What the card knows about subagents
 
 An agent session (Claude Code, Grok Build, ...) is a main agent plus whatever
-subagents and background shells it has dispatched, so "the turn ended" and
-"the work finished" are not the same event. `Stop` typically means the main
-turn ended (even with work still running).
+subagents, watchers, and background shells it has dispatched, so "the turn
+ended" and "the work finished" are not the same event. `Stop` typically means
+the main turn ended (even with work still running).
 
 `herald curtain hook` therefore reads each hook's stdin payload rather than
 trusting its name (and normalizes Claude `hook_event_name` + Grok
-`hookEventName`, `permission_prompt`/`approval_required`, etc.):
+`hookEventName`, `permission_prompt`/`approval_required`, etc.). Every hold on
+`WORKING` is a **truth lease** (`subagent`, `watcher`, `bg_shell`, or `turn`)
+with a TTL under `curtain.lease.*`. Expired leases stop counting without
+another event — the card fails **idle**, not stuck-working:
 
-- **subagents still running** at `Stop` → stays `● WORKING · 2 subagents`,
-  because a subagent keeps the main agent busy and you cannot act yet.
-- **background shells still running** at `Stop` → `✅ DONE · 1 shell in bg`.
-  A CI watch or a long build does not hold you up; the card just says so.
+- **live subagent leases** at `Stop` → stays `● WORKING · 2 subagents` when the
+  host still reports them (Claude task list). A subagent keeps you from acting.
+  On Grok (synthesis hosts) `Stop` reconciles subagent leases empty, then
+  settles to `DONE` unless a watcher lease is still live.
+- **live watcher leases** (`/loop`, `scheduler_create`, `monitor`) at `Stop` →
+  stays `● WORKING` until the watcher ends or its TTL expires (default 900s).
+  Watchers no longer block settle forever.
+- **background shells / tasks** at `Stop` → `✅ DONE · 1 task in bg`. A CI
+  watch or long build does not hold the card on WORKING; the card just says so.
 - `Notification` splits on `notification_type` (or `notificationType`):
   a `permission_prompt` (or Grok `approval_required`) is `⚠ NEEDS YOU`,
   an `idle_prompt` is `✅ DONE` — but an `idle_prompt` never overrides a
   permission prompt that is still waiting on you, and never calls a session
-  done while its subagents are still running. A `Notification` payload carries
-  no `background_tasks` at all, so that last rule reads the counts stored by
-  the last event (or synthesized from Subagent* for Grok). "The main agent is
-  idle" is exactly what a main agent looks like while it waits on subagents.
+  done while subagent or watcher leases are still live.
 
-One caveat, by design: a turn resumed by its finishing subagents emits no
-second `Stop`, so the card holds `WORKING` until the idle notification lands
-(~60s) *and* the subagent count has drained to zero. Being a minute late to
-`DONE` beats being a minute early, which is what sends you to a tab that is
-still working. `UserPromptSubmit` and `arm` both zero the counts, so a count
-that somehow never drains cannot strand a card forever.
+A human `UserPromptSubmit` and a fresh `arm` clear leftover subagent leases so
+a mismatched id cannot strand a card. Synthesis hosts also quiet-settle to
+`DONE` when no live leases remain (see `curtain.settle.*`). If the agent PID
+dies without a hook, the PID backstop forces `DONE`. Prefer a brief false
+`DONE` over a tab that never settles: leases expire; they do not cling.
 
-For Grok, sub counts are synthesized from SubagentStart/Stop when the payload
-lacks `background_tasks`. Full fidelity for Claude; good approx for Grok.
+For Grok, subagent leases are synthesized from SubagentStart/Stop when the
+payload lacks a task list. Full fidelity for Claude; good approx for Grok.
 
 Grind Mode (Mac idle-nag) is phase 2 — separate spec.
+
+## Works well with
+
+Herald is standalone-first: **install only status-herald and you still get the
+curtain cards and native bars** (context, state, clock, and the rest of the
+defaults). Sibling tools are optional. When they are present, extras light up;
+when they are absent, those extras stay empty — nothing errors. The shared
+filesystem convention is documented in
+[docs/AGENT-STATUS-PROVIDERS.md](docs/AGENT-STATUS-PROVIDERS.md)
+([GitHub](https://github.com/muslewski/status-herald/blob/main/docs/AGENT-STATUS-PROVIDERS.md)).
+
+### [token-oracle](https://github.com/muslewski/token-oracle)
+
+Publishes `~/.local/share/token-oracle/forecast.json` (rate-limit / usage
+windows). Herald's bar account segments (`account5h` / `accountWeekly`) and
+Claude statusline gauges read that artifact via `bridge-token-oracle.mjs`
+(override the ingest feed with `HERALD_TOKEN_FEED` if you need a custom path).
+Oracle also writes agent-status session records; with
+`curtain.lines.model: true` the curtain can show live model truth from those
+records. Without oracle, account gauges simply have no data and stay blank.
+
+### [agentic-sage](https://github.com/muslewski/agentic-sage)
+
+Fleet / zone awareness. When sage is on `PATH`, herald can cache
+`sage fleet --json` and — if you enable them — show a curtain zone line
+(`curtain.lines.sageZone: true`) and a bar fleet segment
+(`bars.segments.sage.enabled: true`). Without sage, those lines never appear;
+curtain and bars keep working.
+
+### [llm-armory](https://github.com/muslewski/llm-armory)
+
+Launch labels for child sessions. Armory stamps long-TTL session records
+(model, effort, preset, pid) at spawn time. With `curtain.lines.model: true`,
+the card can render `model@effort` for armory children (and env hints like
+`GROK_MODEL` / `LLM_PRESET` when no record is present). Without armory, herald
+never looks for those launch records; optional model lines just stay off or
+empty.
 
 ## Per-tab curtain (mosh)
 

@@ -158,7 +158,23 @@ See README "Config reference". Curtain works the same regardless of agent.
 | `@herald_settle_ts` | Last settle tick (doctor RC3) |
 | `@herald_state` / `@herald_since` / `@herald_last_active` / `@herald_covered` / `@herald_worked` | Unchanged |
 
-Removed: `@herald_bg_subagents`, `@herald_bg_subagent_ids`, `@herald_bg_shells`, `@herald_bg_watchers`, `@herald_bg_watcher_ids`, `@herald_tasks_seen`.
+Legacy per-kind counters and the old task-list flag are gone — full migration list is in `CHANGELOG.md` (Unreleased).
+
+## Agent Status Providers (siblings)
+
+Optional co-installed tools publish heartbeats/session records under a
+tool-neutral directory. Herald **reads** only (soft-fail: missing → empty
+UI). Normative schema + field tables:
+[`docs/AGENT-STATUS-PROVIDERS.md`](docs/AGENT-STATUS-PROVIDERS.md)
+([main on GitHub](https://github.com/muslewski/status-herald/blob/main/docs/AGENT-STATUS-PROVIDERS.md)).
+
+| Sibling | Herald surface when present |
+|---------|-----------------------------|
+| token-oracle | bar account gauges via `forecast.json`; session records for model line |
+| llm-armory | launch `model@effort` when `curtain.lines.model` |
+| agentic-sage | zone line + `bars.segments.sage` via `sage fleet --json` |
+
+Do not restate schema fields here — link the doc. See README **Works well with**.
 
 ## How it works (internals)
 
@@ -167,6 +183,7 @@ Removed: `@herald_bg_subagents`, `@herald_bg_subagent_ids`, `@herald_bg_shells`,
 - tmux focus hooks + orchestrator swap live/curtain panes.
 - Install uses safe merge + backup (never clobbers foreign hooks).
 - `herald doctor` — hooks absolute, tmux, settle_ts, agent-status, card-loop bin.
+- Token bar feed: `lib/status/bridge-token-oracle.mjs` → `~/.local/share/token-oracle/forecast.json` (`HERALD_TOKEN_FEED` overrides ingest command).
 
 ## Adding support for another agent
 
