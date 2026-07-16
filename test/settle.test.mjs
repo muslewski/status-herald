@@ -63,15 +63,15 @@ test("settleIfStale: synthesis quiet WORKING + all counts 0 → DONE", () => {
   });
 });
 
-test("settleIfStale: live watcher holds WORKING; expired watcher allows quiet settle (RC2)", () => {
-  // Watcher lease still live → null even if quiet > 90
-  assert.equal(
+test("settleIfStale: lone watcher does not block quiet settle (informational)", () => {
+  // Watcher still live but informational — quiet ≥ 90 → DONE
+  assert.deepEqual(
     settleIfStale(snap({ counts: { watcher: 1 }, lastActive: 1000 }), 1400, {
       settleSynthQuietSec: 90,
     }),
-    null,
+    { state: "done", clearLeases: true },
   );
-  // Watcher expired (count already 0 at call site) + quiet ≥ 90 → DONE
+  // Watcher expired (count already 0) + quiet ≥ 90 → DONE (unchanged)
   assert.deepEqual(
     settleIfStale(
       snap({ counts: { watcher: 0 }, lastActive: 1000 }),

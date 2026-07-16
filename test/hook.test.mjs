@@ -162,12 +162,12 @@ test("task-complete inject resumes WORKING so thinking is not stuck on DONE", ()
   );
 });
 
-test("synthetic UPS with active watchers resumes WORKING", () => {
+test("synthetic UPS with only stored watchers does not resume WORKING", () => {
   assert.equal(
     nextState(STATES.DONE, ev({ event: "UserPromptSubmit", synthetic: true }), {
       watchers: 1,
     }),
-    STATES.WORKING,
+    STATES.DONE,
   );
 });
 
@@ -231,24 +231,42 @@ test("Stop with nothing in flight means done", () => {
   assert.equal(nextState(STATES.WORKING, ev({ event: "Stop" })), STATES.DONE);
 });
 
-test("Stop with Grok watchers still in flight stays WORKING", () => {
+test("Stop with Grok watchers still in flight is DONE (watchers informational)", () => {
   assert.equal(
-    nextState(STATES.WORKING, ev({ event: "Stop" }), {
+    nextState(STATES.WORKING, ev({ event: "Stop", hasTasks: false }), {
       subagents: 0,
       watchers: 1,
     }),
-    STATES.WORKING,
+    STATES.DONE,
   );
 });
 
-test("idle_prompt with watchers stays WORKING", () => {
+test("idle_prompt with watchers is DONE (watchers informational)", () => {
   assert.equal(
     nextState(
       STATES.WORKING,
       ev({ event: "Notification", notificationType: "idle_prompt" }),
       { subagents: 0, watchers: 2 },
     ),
+    STATES.DONE,
+  );
+});
+
+test("synthetic UPS loopPrompt → WORKING; lone stored watchers leave cur", () => {
+  assert.equal(
+    nextState(
+      STATES.DONE,
+      ev({ event: "UserPromptSubmit", synthetic: true, loopPrompt: true }),
+      { subagents: 0, watchers: 0 },
+    ),
     STATES.WORKING,
+  );
+  assert.equal(
+    nextState(STATES.DONE, ev({ event: "UserPromptSubmit", synthetic: true }), {
+      subagents: 0,
+      watchers: 1,
+    }),
+    STATES.DONE,
   );
 });
 
