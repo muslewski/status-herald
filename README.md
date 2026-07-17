@@ -2,6 +2,8 @@
 
 Heads-up engine for terminal status surfaces.
 
+<p align="center"><img src="./assets/demo-curtain.gif" width="720" alt="herald curtain stage-draw demo"></p>
+
 ## Curtain (phase 1)
 
 Covers a working agent session pane (Claude Code, Grok Build, etc.) in a tmux
@@ -31,6 +33,10 @@ next `install`. Run `herald curtain doctor` to confirm the wired command
 resolves; `herald curtain inspect` shows each session's state, in-flight
 counts, and how long ago its last hook landed.
 
+<details><summary>▶ demo — curtain inspect</summary>
+<p><img src="./assets/demo-inspect.gif" width="600" alt="herald curtain inspect demo"></p>
+</details>
+
 For native Grok (no .claude dir):
 ```bash
 herald curtain install grok   # or --grok
@@ -49,6 +55,10 @@ herald curtain up --slots 2 --cmd grok     # Grok Build grid
 herald curtain doctor                      # verify wiring (checks claude + grok)
 herald curtain down                        # tear down
 ```
+
+<details><summary>▶ demo — doctor</summary>
+<p><img src="./assets/demo-doctor.gif" width="600" alt="herald doctor demo"></p>
+</details>
 
 While a session works and its pane is unfocused it shows `● WORKING m:ss`;
 finished panes show `✅ DONE`; blocked panes show `⚠ NEEDS YOU`. Click a card
