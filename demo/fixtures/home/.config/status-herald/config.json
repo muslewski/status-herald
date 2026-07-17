@@ -1,0 +1,16 @@
+{
+  "curtain": {
+    "theme": "forge",
+    "animation": {
+      "enabled": true,
+      "fps": 2,
+      "reducedMotion": false,
+      "drawFrames": 8,
+      "drawMs": 600
+    },
+    "tmuxBar": {
+      "whenCovered": "keep",
+      "wash": false
+    }
+  }
+}
