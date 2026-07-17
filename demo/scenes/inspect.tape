@@ -4,7 +4,9 @@ Output build/demo-inspect.txt
 Set Width 1000
 Set Height 500
 Hide
-Type "export PS1='demo$ '; export PATH=\"$HOME/bin:$PATH\"; unset TMUX; clear"
+Type "source ~/.bashrc"
+Enter
+Type "clear"
 Enter
 Show
 Type "herald curtain inspect"
