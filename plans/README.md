@@ -46,6 +46,9 @@ invariant.
 | 018 | Status engine (segments, roles, width-drop) | P1 | M | 017 | DONE (landed; quality-revision Phase 3) |
 | 019 | Status compute + bridges | P1 | M | 018 | DONE (landed; quality-revision Phase 3) |
 | 020 | Status surfaces wiring | P1 | L | 019 | DONE (landed; cutover is 021) |
+| 024 | Denizens motion base (driftField particles + one-motion-language bars) | P1 | M | curtain (024 standalone) | IN PROGRESS (feat/herald-denizens) |
+| 025 | Denizens entities (per-session reactive creatures, seed funnel, tiers) | P2 | L | 024 | PLAN |
+| 026 | Denizens bestiary + config (8 species, validateDenizen, config gate) | P2 | M | 025 | PLAN |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
 REJECTED (with one-line rationale) | SUPERSEDED | PARTIAL | FROZEN
@@ -57,6 +60,17 @@ Landed plans **013–019** completed a Grok 4.5 **revise-executed** campaign (cl
 `plans/revision-README.md`). Plan **020** may resume — quality-revision campaign closed with green light.
 Do not treat this table’s DONE as “never audit” — DONE means shipped enough to
 revise, not “perfect.”
+
+## Denizens program (2026-07-18)
+
+Plans **024–026** implement the Denizens design
+(`docs/superpowers/specs/2026-07-18-herald-denizens-design.md`): coherent
+particles (fix the `sparkRain` flicker), per-session reactive ASCII creatures
+(deterministic per tab, responsive tiers), and one unified state hue/period
+across curtain + tmux + Claude bar. Read
+`docs/superpowers/plans/2026-07-18-denizens-RECONCILE.md` for authoritative
+overrides (tier geometry, Claude-bar contrast). 024 ships independent value
+(flicker + bar-mismatch fixes) and does not depend on 025/026.
 
 ## Dependency notes
 
