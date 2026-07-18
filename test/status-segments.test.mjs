@@ -280,6 +280,24 @@ test("buildModelItem / buildStateItem null on empty", () => {
   });
 });
 
+test("buildStateItem: WORKING gets accent (amber colour214), else dim", () => {
+  assert.deepEqual(buildStateItem("●", "working"), {
+    id: "state",
+    text: "●",
+    role: "accent",
+    priority: 90,
+  });
+  // back-compat: no state / non-working → dim (unchanged)
+  assert.deepEqual(buildStateItem("▶"), {
+    id: "state",
+    text: "▶",
+    role: "dim",
+    priority: 90,
+  });
+  assert.equal(buildStateItem("⏸", "idle").role, "dim");
+  assert.equal(ROLES.accent.tmux, "colour214"); // amber == wash working hue
+});
+
 test("REGISTRY + orderSegments respects bars.segments enabled/order/priority", () => {
   const ordered = orderSegments(REGISTRY, {
     segments: {

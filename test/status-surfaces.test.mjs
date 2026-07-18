@@ -160,6 +160,27 @@ test("ctxBucketTmux and stateGlyph match Python bands/glyphs", () => {
   assert.equal(stateGlyph("idle"), "⏸");
 });
 
+test("stateGlyph phase-cycles WORKING on the wash period when t is given", () => {
+  // back-compat: no t → static glyphs unchanged
+  assert.equal(stateGlyph("busy"), "▶");
+  assert.equal(stateGlyph("idle"), "⏸");
+  assert.equal(stateGlyph("needs"), "⚠");
+  // t given → WORKING breathes; frame 0 is the full dot ●
+  assert.equal(stateGlyph("working", 0), "●");
+  // period is 5s (stateHue.working); one full cycle returns to start
+  assert.equal(stateGlyph("working", 5), stateGlyph("working", 0));
+  // mid-cycle differs from start (soft breathe, not static)
+  assert.notEqual(stateGlyph("working", 2.5), stateGlyph("working", 0));
+  // every phase glyph is from the pulse ramp (soft, no strobe)
+  const ramp = new Set();
+  for (let i = 0; i < 10; i++) ramp.add(stateGlyph("busy", i * 0.5));
+  for (const g of ramp) {
+    assert.ok(["●", "◐", "○", "◑"].includes(g), `pulse glyph ${g}`);
+  }
+  // needs/idle ignore t (event surfaces, no working pulse)
+  assert.equal(stateGlyph("needs", 2), "⚠");
+});
+
 test("syncWindows writes ctxbar at window and session via spy", () => {
   const store = {};
   const exec = (args) => {
@@ -368,8 +389,12 @@ test("renderClaudeStatusline busy render includes working chip", async () => {
       },
     );
     assert.match(out, /working/);
-    // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC for WORK_BG assert
-    assert.match(out, /\x1b\[48;5;54m/);
+    assert.match(out, /●/); // dot family unifies with card + tmux tab
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC for WORK_BG (amber 214)
+    assert.match(out, /\x1b\[48;5;214m/);
+    // dark ink on amber for readable contrast (RECONCILE R2)
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC for WORK_FG
+    assert.match(out, /\x1b\[1;38;5;232m/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

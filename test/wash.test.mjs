@@ -7,7 +7,42 @@ import {
   formatSlideLine,
   sampleWash,
   slidePos,
+  stateHue,
 } from "../lib/curtain/wash.mjs";
+
+test("stateHue is the single hue/period source (amber/green/rose/steel)", () => {
+  assert.deepEqual(stateHue("working"), {
+    ansi: 214,
+    tmux: "colour214",
+    periodSec: 5,
+  });
+  assert.deepEqual(stateHue("done"), {
+    ansi: 70,
+    tmux: "colour70",
+    periodSec: 3,
+  });
+  assert.deepEqual(stateHue("needs"), {
+    ansi: 167,
+    tmux: "colour167",
+    periodSec: 3,
+  });
+  assert.deepEqual(stateHue("compacting"), {
+    ansi: 67,
+    tmux: "colour67",
+    periodSec: 4,
+  });
+  assert.equal(stateHue("idle").periodSec, 0);
+  assert.equal(
+    stateHue("bogus").periodSec,
+    0,
+    "unknown → idle fallback, no throw",
+  );
+});
+
+test("wash comet hot colour is the stateHue amber (single source)", () => {
+  const w = sampleWash({ state: "working", nowSec: 0 });
+  assert.match(w.line, new RegExp(stateHue("working").tmux));
+});
 
 test("sampleWash idle has empty line and transparent intent", () => {
   const w = sampleWash({ state: "idle", nowSec: 10 });
