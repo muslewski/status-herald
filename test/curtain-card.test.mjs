@@ -571,6 +571,87 @@ test("forge NEEDS breathe modulates red family without hard on/off only", () => 
   assert.notEqual(dim, mid);
 });
 
+test("forge WORKING paints ambient motes into whitespace only (art sacred)", () => {
+  const base = renderCard("working", 5, 40, 12, {}, BUILTINS.forge, 3)
+    .map(plain)
+    .join("\n");
+  const mo = renderCard("working", 5, 40, 12, {}, BUILTINS.forge, 3, {
+    themeName: "forge",
+    animCfg: { enabled: true },
+    seed: 1,
+  })
+    .map(plain)
+    .join("\n");
+  // Anvil art survives (sacred), motes appear somewhere.
+  assert.match(mo, /=======/);
+  assert.match(mo, /[·˙ʼ]/, "ambient drift motes present");
+  // Every non-space cell of base is still present (no art overwritten).
+  const bl = base.split("\n");
+  const ml = mo.split("\n");
+  for (let r = 0; r < bl.length; r++) {
+    for (let c = 0; c < bl[r].length; c++) {
+      if (bl[r][c] !== " ") {
+        assert.equal(ml[r][c], bl[r][c], `art cell (${r},${c}) preserved`);
+      }
+    }
+  }
+});
+
+test("forge WORKING motion-off is byte-identical to no-theatrics baseline", () => {
+  const baseline = renderCard("working", 5, 40, 12, {}, BUILTINS.forge, 3).join(
+    "\n",
+  );
+  const off = renderCard("working", 5, 40, 12, {}, BUILTINS.forge, 3, {
+    themeName: "forge",
+    animCfg: { enabled: false },
+    seed: 1,
+  }).join("\n");
+  assert.equal(off, baseline, "motion-off ≡ static baseline (byte-identical)");
+});
+
+test("classic WORKING with theatrics stays static (no motes)", () => {
+  const base = renderCard("working", 5, 40, 12, {}, BUILTINS.classic, 3).join(
+    "\n",
+  );
+  const withOpts = renderCard("working", 5, 40, 12, {}, BUILTINS.classic, 3, {
+    themeName: "classic",
+    animCfg: { enabled: true },
+    seed: 1,
+  }).join("\n");
+  assert.equal(withOpts, base);
+});
+
+test("WORKING motes render keeps exact rows×cols geometry", () => {
+  const out = renderCard("working", 5, 37, 11, {}, BUILTINS.forge, 2, {
+    themeName: "forge",
+    animCfg: { enabled: true },
+    seed: 4,
+  });
+  assert.equal(out.length, 11);
+  for (const l of out) {
+    const w = plain(l).length;
+    assert.ok(w === 0 || w === 37, `line width ${w} is 0 or exactly cols`);
+  }
+});
+
+test("WORKING field varies with seed (per-tab variety)", () => {
+  const a = renderCard("working", 5, 40, 12, {}, BUILTINS.forge, 3, {
+    themeName: "forge",
+    animCfg: { enabled: true },
+    seed: 1,
+  })
+    .map(plain)
+    .join("\n");
+  const b = renderCard("working", 5, 40, 12, {}, BUILTINS.forge, 3, {
+    themeName: "forge",
+    animCfg: { enabled: true },
+    seed: 900,
+  })
+    .map(plain)
+    .join("\n");
+  assert.notEqual(a, b);
+});
+
 test("resolveModelLine records beat hint; disabled yields empty", async () => {
   const { resolveModelLine } = await import("../lib/surfaces/curtain-card.mjs");
   assert.equal(resolveModelLine({ enabled: false, modelHint: "x" }), "");
