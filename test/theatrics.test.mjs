@@ -2,13 +2,13 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   DRIFT_GLYPHS,
+  applyTheatrics,
   breatheAmp,
   coverageRatio,
   drawFrameMs,
   driftField,
   motionDisabled,
   selectEffects,
-  sparkRain,
   stageCurtain,
 } from "../lib/curtain/theatrics.mjs";
 
@@ -73,27 +73,6 @@ test("stageCurtain uses density ramp glyphs (░▒▓█)", () => {
   assert.match(mid, /[░▒▓█]/);
 });
 
-test("sparkRain: 3–5 frame sequence, deterministic, sparse sparks", () => {
-  const cols = 40;
-  const rows = 12;
-  const frames = 5;
-  for (let i = 0; i < frames; i++) {
-    const t = i / (frames - 1);
-    const lines = sparkRain(cols, rows, t, { palette: "done" });
-    assert.equal(lines.length, rows);
-    for (const l of lines) assert.equal(plain(l).length, cols);
-  }
-  // Early frames have sparks; not a solid flood.
-  const early = sparkRain(40, 12, 0.2, { palette: "done" }).join("");
-  assert.match(early, /[*.·+]/);
-  const cov = coverageRatio(sparkRain(40, 12, 0.2, { palette: "done" }));
-  assert.ok(cov < 0.35, "sparks are sparse, not a solid fill");
-  assert.equal(
-    sparkRain(20, 6, 0.4).join("\n"),
-    sparkRain(20, 6, 0.4).join("\n"),
-  );
-});
-
 test("breatheAmp is soft 0..1 cycle (no hard strobe edges)", () => {
   const samples = [];
   for (let i = 0; i < 20; i++) samples.push(breatheAmp(i * 0.25, 3));
@@ -118,20 +97,34 @@ test("selectEffects: classic → none", () => {
     animCfg: { enabled: true, reducedMotion: false },
   });
   assert.equal(e.stageDraw, false);
-  assert.equal(e.sparkRain, false);
+  assert.equal(e.burst, false);
+  assert.equal(e.motes, false);
   assert.equal(e.barFlash, false);
   assert.equal(e.breathe, false);
 });
 
-test("selectEffects: DONE → spark-rain + bar flash (non-classic)", () => {
+test("selectEffects: DONE → burst + bar flash (non-classic)", () => {
   const e = selectEffects({
     state: "done",
     themeName: "forge",
     animCfg: { enabled: true, reducedMotion: false },
   });
-  assert.equal(e.sparkRain, true);
+  assert.equal(e.burst, true);
+  assert.equal(e.motes, false);
   assert.equal(e.barFlash, true);
   assert.equal(e.breathe, false);
+  assert.equal(e.stageDraw, true);
+});
+
+test("selectEffects: WORKING → ambient motes (non-classic)", () => {
+  const e = selectEffects({
+    state: "working",
+    themeName: "forge",
+    animCfg: { enabled: true },
+  });
+  assert.equal(e.motes, true);
+  assert.equal(e.burst, false);
+  assert.equal(e.barFlash, false);
   assert.equal(e.stageDraw, true);
 });
 
@@ -142,7 +135,8 @@ test("selectEffects: NEEDS → breathe (non-classic)", () => {
     animCfg: { enabled: true },
   });
   assert.equal(e.breathe, true);
-  assert.equal(e.sparkRain, false);
+  assert.equal(e.burst, false);
+  assert.equal(e.motes, false);
   assert.equal(e.barFlash, false);
   assert.equal(e.stageDraw, true);
 });
@@ -158,20 +152,22 @@ test("selectEffects: motion off disables all theatrics", () => {
       animCfg,
     });
     assert.equal(e.stageDraw, false);
-    assert.equal(e.sparkRain, false);
+    assert.equal(e.burst, false);
+    assert.equal(e.motes, false);
     assert.equal(e.barFlash, false);
     assert.equal(e.breathe, false);
   }
 });
 
-test("selectEffects: working/compacting get stageDraw only when non-classic", () => {
+test("selectEffects: working gets stageDraw + motes when non-classic", () => {
   const w = selectEffects({
     state: "working",
     themeName: "minimal",
     animCfg: { enabled: true },
   });
   assert.equal(w.stageDraw, true);
-  assert.equal(w.sparkRain, false);
+  assert.equal(w.motes, true);
+  assert.equal(w.burst, false);
   assert.equal(w.breathe, false);
 });
 
@@ -245,4 +241,42 @@ test("driftField: different seeds → different fields (per-tab variety)", () =>
 test("driftField: zero dims → empty grid, no throw", () => {
   assert.deepEqual(driftField(0, 0, 1, { seed: 1 }), []);
   assert.equal(driftField(0, 5, 1).length, 5);
+});
+
+test("applyTheatrics WORKING motes paint whitespace-only (art sacred)", () => {
+  const base = ["ABCDEFGH", "IJKLMNOP", "QRSTUVWX"]; // fully inked rows
+  const out = applyTheatrics(base, {
+    cols: 8,
+    rows: 3,
+    effects: { motes: true, burst: false, stageDraw: false },
+    tick: 4,
+    seed: 1,
+  });
+  assert.equal(
+    out.join("\n"),
+    base.join("\n"),
+    "no non-space base cell overwritten",
+  );
+});
+
+test("applyTheatrics DONE burst decays across ticks (no 5-frame hard clear)", () => {
+  const blank = Array.from({ length: 12 }, () => " ".repeat(40));
+  const ink = (ls) => ls.join("").replace(/ /g, "").length;
+  const early = applyTheatrics(blank, {
+    cols: 40,
+    rows: 12,
+    effects: { burst: true },
+    tick: 0,
+    sparkFrames: 5,
+  });
+  const late = applyTheatrics(blank, {
+    cols: 40,
+    rows: 12,
+    effects: { burst: true },
+    tick: 3,
+    sparkFrames: 5,
+  });
+  assert.ok(ink(early) > 0, "burst present at t0");
+  assert.ok(ink(late) < ink(early), "burst decays, not a hard clear");
+  assert.match(early.join(""), /[*.+·]/, "burst uses spark glyph family");
 });
