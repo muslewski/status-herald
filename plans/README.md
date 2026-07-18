@@ -46,7 +46,7 @@ invariant.
 | 018 | Status engine (segments, roles, width-drop) | P1 | M | 017 | DONE (landed; quality-revision Phase 3) |
 | 019 | Status compute + bridges | P1 | M | 018 | DONE (landed; quality-revision Phase 3) |
 | 020 | Status surfaces wiring | P1 | L | 019 | DONE (landed; cutover is 021) |
-| 024 | Denizens motion base (driftField particles + one-motion-language bars) | P1 | M | curtain (024 standalone) | IN PROGRESS (feat/herald-denizens) |
+| 024 | Denizens motion base (driftField particles + one-motion-language bars) | P1 | M | curtain (024 standalone) | DONE (feat/herald-denizens; T1–T7, 468/468, render-verified) |
 | 025 | Denizens entities (per-session reactive creatures, seed funnel, tiers) | P2 | L | 024 | PLAN |
 | 026 | Denizens bestiary + config (8 species, validateDenizen, config gate) | P2 | M | 025 | PLAN |
 
