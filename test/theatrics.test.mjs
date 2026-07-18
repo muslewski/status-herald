@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  DRIFT_GLYPHS,
   breatheAmp,
   coverageRatio,
   drawFrameMs,
+  driftField,
   motionDisabled,
   selectEffects,
   sparkRain,
@@ -178,4 +180,69 @@ test("drawFrameMs divides draw budget across frames", () => {
   assert.equal(drawFrameMs({ drawFrames: 10, drawMs: 600 }), 60);
   assert.equal(drawFrameMs({ drawFrames: 0, drawMs: 600 }), 1000);
   assert.equal(drawFrameMs({}), 75); // defaults 8 / 600
+});
+
+test("driftField: exact geometry — rows lines each cols wide, sparse", () => {
+  const lines = driftField(40, 12, 1.0, { seed: 7 });
+  assert.equal(lines.length, 12);
+  for (const l of lines) assert.equal(plain(l).length, 40);
+  const cov = coverageRatio(lines); // fabric glyphs → 0 here, but assert sparse ink
+  assert.ok(cov < 0.35, "field is sparse, not a flood");
+});
+
+test("driftField: identity is COORDINATE-ONLY — no per-frame re-randomization", () => {
+  // The flicker bug was phase XOR'd into the hash. With fade off and tiny t
+  // steps (sub-cell, no drift), consecutive frames must be BYTE-IDENTICAL:
+  // the same lattice points are motes every frame.
+  const a = driftField(40, 12, 0.0, { seed: 3, fade: false }).join("\n");
+  const b = driftField(40, 12, 0.01, { seed: 3, fade: false }).join("\n");
+  const c = driftField(40, 12, 0.02, { seed: 3, fade: false }).join("\n");
+  assert.equal(a, b, "no re-sample between adjacent frames");
+  assert.equal(b, c, "no re-sample between adjacent frames");
+});
+
+test("driftField: motes drift along dir over time (slide, not vanish)", () => {
+  const t0 = driftField(40, 12, 0.0, { seed: 5, fade: false, dir: "lateral" });
+  const t1 = driftField(40, 12, 8.0, { seed: 5, fade: false, dir: "lateral" });
+  const ink = (ls) => ls.join("").replace(/ /g, "").length;
+  assert.notEqual(t0.join("\n"), t1.join("\n"), "field advanced with t");
+  // Motes moved, they did not disappear: ink count stays close (fade off).
+  assert.ok(
+    Math.abs(ink(t0) - ink(t1)) <= Math.ceil(ink(t0) * 0.25),
+    "motes persist",
+  );
+});
+
+test("driftField: age ramp fades glyphs through the ramp over lifetime", () => {
+  const seen = new Set();
+  for (let i = 0; i <= 24; i++) {
+    for (const ch of driftField(40, 12, i * 0.25, { seed: 9 }).join("")) {
+      if (ch !== " ") seen.add(ch);
+    }
+  }
+  // every painted glyph is from the ramp, and ≥2 distinct ramp glyphs appear
+  for (const ch of seen)
+    assert.ok(DRIFT_GLYPHS.includes(ch), `ramp glyph: ${ch}`);
+  assert.ok(
+    [...seen].filter((c) => c !== " ").length >= 2,
+    "fade uses ≥2 ramp steps",
+  );
+});
+
+test("driftField: deterministic for same args", () => {
+  assert.equal(
+    driftField(30, 8, 1.7, { seed: 2 }).join("\n"),
+    driftField(30, 8, 1.7, { seed: 2 }).join("\n"),
+  );
+});
+
+test("driftField: different seeds → different fields (per-tab variety)", () => {
+  const a = driftField(40, 12, 1.0, { seed: 1 }).join("\n");
+  const b = driftField(40, 12, 1.0, { seed: 999 }).join("\n");
+  assert.notEqual(a, b);
+});
+
+test("driftField: zero dims → empty grid, no throw", () => {
+  assert.deepEqual(driftField(0, 0, 1, { seed: 1 }), []);
+  assert.equal(driftField(0, 5, 1).length, 5);
 });
