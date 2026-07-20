@@ -159,6 +159,10 @@ herald curtain cover <session>   # show the card (if working/done/needs)
 herald curtain reveal <session>  # show the live session
 herald curtain focus "<title>"   # reveal the tab whose label == title, cover the rest
 herald curtain reveal-all        # panic: reveal everything
+herald curtain pause [session]   # hold curtain open (copy text); no auto-cover
+herald curtain resume [session]  # re-enable cover for that session
+herald curtain pause-all         # hold every armed session open
+herald curtain resume-all        # re-enable cover fleet-wide
 herald curtain arm-all           # arm every session matching config's autoArm.sessionGlob
 ```
 
@@ -220,7 +224,8 @@ The `curtain` block, with its defaults:
 ```
 
 - `enabled` — kill switch; when `false` every per-tab verb (`arm`, `disarm`,
-  `cover`, `reveal`, `reveal-all`, `focus`, `arm-all`) no-ops.
+  `cover`, `reveal`, `reveal-all`, `pause`, `resume`, `pause-all`,
+  `resume-all`, `focus`, `arm-all`) no-ops.
 - `coverableStates` — session states eligible to be covered by a card.
 - `focus.source` — which reference adapter the dispatcher (`run.sh`) runs:
   `"ssh-osascript"` (poll, the default + agent-free fallback) or
@@ -361,7 +366,8 @@ newly created sessions get armed automatically per `autoArm.sessionGlob`;
 ### Write your own adapter
 
 The box's whole surface area is `herald curtain focus "<title>"` (plus
-`arm`/`disarm`/`cover`/`reveal`/`reveal-all`/`arm-all` for setup and
+`arm`/`disarm`/`cover`/`reveal`/`reveal-all`/`pause`/`resume`/
+`pause-all`/`resume-all`/`arm-all` for setup and
 recovery) — any adapter that calls it on tab-focus-change qualifies. Poll,
 or subscribe to native OS events; run on the box itself, over ssh, or push
 through a queue. Only rule: send the **raw** title and let the box normalize.

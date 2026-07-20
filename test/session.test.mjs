@@ -11,7 +11,11 @@ import {
   cover,
   disarm,
   focus,
+  pause,
+  pauseAll,
   refreshCards,
+  resume,
+  resumeAll,
   reveal,
   revealAll,
   shouldSettleSynthSubagentStop,
@@ -76,6 +80,7 @@ const makeT = (init = {}) => {
           state: v.opts?.["@herald_state"] || "",
           liveWin: v.opts?.["@herald_live_win"] || "",
           activeWin: v.active ?? "",
+          paused: v.opts?.["@herald_paused"] === "1",
         })),
     windowNames: () => {
       const m = {};
@@ -2364,4 +2369,75 @@ test("Claude 3 shells + 5 monitors do not collapse to 1 watcher + 8 tasks", () =
       new RegExp(`bg_shell:${id}:`),
     );
   }
+});
+
+// --- curtain pause (hold-open for copy/select) ---
+
+test("pause reveals a covered session and sets @herald_paused", () => {
+  const t = makeT(freshSession());
+  arm("s1", t);
+  t.setSessOpt("s1", "@herald_state", "working");
+  cover("s1", t);
+  assert.equal(t.getSessOpt("s1", "@herald_covered"), "1");
+  pause("s1", t);
+  assert.equal(t.getSessOpt("s1", "@herald_paused"), "1");
+  assert.equal(t.getSessOpt("s1", "@herald_covered"), "0");
+  assert.equal(t._S.s1.active, "@live");
+});
+
+test("cover is a no-op while paused", () => {
+  const t = makeT(freshSession());
+  arm("s1", t);
+  t.setSessOpt("s1", "@herald_state", "working");
+  pause("s1", t);
+  cover("s1", t);
+  assert.equal(t.getSessOpt("s1", "@herald_covered"), "0");
+  assert.equal(t._S.s1.active, "@live");
+});
+
+test("focus does not cover a paused session", () => {
+  const t = makeT(twoArmed());
+  pause("s2", t);
+  focus("Syndcast Backlog", t); // reveal s1, would cover s2 if not paused
+  assert.equal(t.getSessOpt("s1", "@herald_covered"), "0");
+  assert.equal(t.getSessOpt("s2", "@herald_paused"), "1");
+  assert.equal(t.getSessOpt("s2", "@herald_covered"), "0");
+  assert.equal(t._S.s2.active, "@w2", "paused session stays on live window");
+});
+
+test("resume clears pause so cover/focus may re-cover", () => {
+  const t = makeT(freshSession());
+  arm("s1", t);
+  t.setSessOpt("s1", "@herald_state", "working");
+  pause("s1", t);
+  resume("s1", t);
+  assert.equal(t.getSessOpt("s1", "@herald_paused"), "0");
+  cover("s1", t);
+  assert.equal(t.getSessOpt("s1", "@herald_covered"), "1");
+});
+
+test("pauseAll / resumeAll affect every armed session", () => {
+  const t = makeT(twoArmed());
+  cover("s1", t);
+  cover("s2", t);
+  pauseAll(t);
+  assert.equal(t.getSessOpt("s1", "@herald_paused"), "1");
+  assert.equal(t.getSessOpt("s2", "@herald_paused"), "1");
+  assert.equal(t.getSessOpt("s1", "@herald_covered"), "0");
+  assert.equal(t.getSessOpt("s2", "@herald_covered"), "0");
+  resumeAll(t);
+  assert.equal(t.getSessOpt("s1", "@herald_paused"), "0");
+  assert.equal(t.getSessOpt("s2", "@herald_paused"), "0");
+  cover("s1", t);
+  assert.equal(t.getSessOpt("s1", "@herald_covered"), "1");
+});
+
+test("arm resets paused flag", () => {
+  const t = makeT(freshSession());
+  arm("s1", t);
+  t.setSessOpt("s1", "@herald_paused", "1");
+  // re-arm is a no-op while still armed — disarm then arm clears
+  disarm("s1", t);
+  arm("s1", t);
+  assert.equal(t.getSessOpt("s1", "@herald_paused"), "0");
 });
