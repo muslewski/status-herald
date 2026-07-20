@@ -112,9 +112,10 @@ test("buildArgs.snapshot lists sessions with the curtain-state format", () => {
     "#{@herald_state}",
     "#{@herald_live_win}",
     "#{window_id}",
+    "#{@herald_paused}",
   ])
     assert.ok(a[2].includes(f), `format missing ${f}`);
-  assert.equal(a[2].split("\t").length, 6, "six tab-separated fields");
+  assert.equal(a[2].split("\t").length, 7, "seven tab-separated fields");
 });
 
 test("buildArgs.windowMap lists every window id and name across sessions", () => {
@@ -128,8 +129,9 @@ test("buildArgs.windowMap lists every window id and name across sessions", () =>
 
 test("parseSnapshot keeps only armed sessions and splits their fields", () => {
   const raw = [
-    "hermes\t1\t1\tworking\t@22\t@98",
-    "token-oracle\t1\t0\tdone\t@41\t@41",
+    "hermes\t1\t1\tworking\t@22\t@98\t1",
+    "token-oracle\t1\t0\tdone\t@41\t@41\t0",
+    "legacy\t1\t0\tidle\t@7\t@7", // 6-field back-compat → paused false
     "token-oracle-2\t\t\t\t\t@81", // not armed -> dropped
   ].join("\n");
   assert.deepEqual(parseSnapshot(raw), [
@@ -139,6 +141,7 @@ test("parseSnapshot keeps only armed sessions and splits their fields", () => {
       state: "working",
       liveWin: "@22",
       activeWin: "@98",
+      paused: true,
     },
     {
       name: "token-oracle",
@@ -146,6 +149,15 @@ test("parseSnapshot keeps only armed sessions and splits their fields", () => {
       state: "done",
       liveWin: "@41",
       activeWin: "@41",
+      paused: false,
+    },
+    {
+      name: "legacy",
+      covered: false,
+      state: "idle",
+      liveWin: "@7",
+      activeWin: "@7",
+      paused: false,
     },
   ]);
 });

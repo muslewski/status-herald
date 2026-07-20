@@ -70,7 +70,17 @@ Herald normalizes these.
    - Any key in card → reveals the live Grok TUI.
    - `herald curtain status` (from inside a pane) shows current `@herald_state`.
 
-5. Teardown:
+5. Hold open (copy text from a live pane without the card re-covering):
+   ```bash
+   herald curtain pause           # this session (or pass a session name)
+   herald curtain resume          # re-enable auto-cover for this session
+   herald curtain pause-all       # every armed session
+   herald curtain resume-all
+   ```
+   Pause keeps the session armed (hooks still stamp state) but forces reveal
+   and skips cover until resume. Useful when selecting text into a browser.
+
+6. Teardown:
    ```bash
    herald curtain disarm
    herald curtain down   # for grid
@@ -156,6 +166,7 @@ See README "Config reference". Curtain works the same regardless of agent.
 | `@herald_agent_pid` | Agent process pid (PID backstop) |
 | `@herald_model_hint` | Env-derived model@effort fallback |
 | `@herald_settle_ts` | Last settle tick (doctor RC3) |
+| `@herald_paused` | `1` = hold curtain open (no auto-cover) until resume |
 | `@herald_state` / `@herald_since` / `@herald_last_active` / `@herald_covered` / `@herald_worked` | Unchanged |
 
 Legacy per-kind counters and the old task-list flag are gone — full migration list is in `CHANGELOG.md` (Unreleased).

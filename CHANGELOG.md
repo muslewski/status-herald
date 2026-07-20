@@ -58,6 +58,12 @@ Re-arm after upgrade: `herald curtain disarm && herald curtain arm` (or
 
 ### Added
 
+- **Curtain pause / resume** — hold a session’s curtain open so the live agent
+  pane stays selectable (copy text to a browser, etc.) without the focus
+  adapter re-covering it:
+  - `herald curtain pause [session]` / `resume [session]`
+  - `herald curtain pause-all` / `resume-all`
+  - Session opt `@herald_paused=1`; still armed (hooks keep stamping state).
 - **Denizens P1 — coherent particles + one motion language**
   (`docs/superpowers/specs/2026-07-18-herald-denizens-design.md`):
   - `driftField` particle engine (coordinate-only mote identity + continuous
