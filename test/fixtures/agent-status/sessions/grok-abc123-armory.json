@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "source_cli": "grok",
+  "session_id": "abc123",
+  "pid": 4321,
+  "cwd": "/home/user/repo",
+  "model": "grok-4.5",
+  "effort": "low",
+  "preset": "grok-high",
+  "written_by": "llm-armory",
+  "started_at": 1784200000000,
+  "updated_at": 1784200200000,
+  "ttl_ms": 60000
+}

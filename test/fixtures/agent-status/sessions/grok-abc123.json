@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "source_cli": "grok",
+  "session_id": "abc123",
+  "pid": 4321,
+  "cwd": "/home/user/repo",
+  "model": "grok-4.5",
+  "effort": "high",
+  "preset": "grok-high",
+  "written_by": "token-oracle",
+  "started_at": 1784200000000,
+  "updated_at": 1784200100000,
+  "ttl_ms": 60000
+}

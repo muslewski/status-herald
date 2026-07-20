@@ -8,12 +8,11 @@ starting, honor its STOP conditions, and update your row when done.
 
 **What this project is**: **HERALD** — *Heads-up Engine for Rendering
 Adaptive Line Displays* (npm: `status-herald`, binary: `herald`). One
-convention and one zero-dependency Node CLI for rendering bottom status
-bars across terminal hosts: Claude Code's `statusLine`, tmux's
-status-right, and later zellij/kitty. Installed globally, configured
-per-project (presets keyed by repo identity). Ships presets for
-token-oracle forecasts/alerts, agentic-sage session/fleet info, and a
-stoic-quote bar.
+convention and one zero-dependency Node CLI for rendering status surfaces
+across terminal hosts and agents: Claude Code `statusLine`/hooks, Grok Build
+hooks + TUI-in-tmux, tmux curtain/status-right, and later zellij/kitty.
+Installed globally, configured per-project. Supports agent-agnostic curtain
+cards for tmux (● WORKING etc).
 
 **Source anchors** (external contracts these plans excerpt; re-verify on
 drift): token-oracle @ `ada32e9`, agentic-sage @ `cffd055`, Claude Code
@@ -27,19 +26,51 @@ invariant.
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
-| 001 | Bootstrap repo skeleton (git, CI, biome, release-please) | P1 | S | — | TODO |
-| 002 | Segment model, theme engine, ansi/tmux/plain renderers | P1 | M | 001 | TODO |
-| 003 | Config, project registry (repoId), preset resolution | P1 | M | 001 | TODO |
-| 004 | Provider layer (json-file, file-age, command, static, claude-context) | P1 | M | 001, 003 | TODO |
-| 005 | Surfaces: claude-code + tmux render, safe installers, doctor | P1 | L | 001–004 | TODO |
-| 006 | Six built-in presets + preset loader | P1 | M | 001–005 | TODO |
-| 007 | Interactivity: `herald menu` (tmux display-menu + fallback) | P2 | S | 003, 005, 006 | TODO |
-| 008 | Identity: display name, `herald name`, tmux rename sync | P2 | S | 003, 005, 006 | TODO |
-| 009 | Documentation to the agentic-sage quality bar | P2 | M | 001–008 | TODO |
-| 010 | Research spike: zellij + kitty surfaces (report only) | P3 | S | 002, 005 | TODO |
+| 001 | Bootstrap repo skeleton (git, CI, biome, release-please) | P1 | S | — | DONE (bootstrap shipped; not re-audited this campaign) |
+| 002 | Segment model, theme engine, ansi/tmux/plain renderers | P1 | M | 001 | SUPERSEDED — never built; harvest path is Plan 017+ (see 017) |
+| 003 | Config, project registry (repoId), preset resolution | P1 | M | 001 | SUPERSEDED — never built; harvest path is Plan 017+ (see 017) |
+| 004 | Provider layer (json-file, file-age, command, static, claude-context) | P1 | M | 001, 003 | SUPERSEDED — never built; harvest path is Plan 017+ (see 017) |
+| 005 | Surfaces: claude-code + tmux render, safe installers, doctor | P1 | L | 001–004 | SUPERSEDED — never built; harvest path is Plan 017+ (see 017) |
+| 006 | Six built-in presets + preset loader | P1 | M | 001–005 | SUPERSEDED — never built; harvest path is Plan 017+ (see 017) |
+| 007 | Interactivity: `herald menu` (tmux display-menu + fallback) | P2 | S | 003, 005, 006 | SUPERSEDED / DEFERRED — never built as written |
+| 008 | Identity: display name, `herald name`, tmux rename sync | P2 | S | 003, 005, 006 | SUPERSEDED / DEFERRED — never built as written |
+| 009 | Documentation to the agentic-sage quality bar | P2 | M | 001–008 | SUPERSEDED / DEFERRED — never built as written |
+| 010 | Research spike: zellij + kitty surfaces (report only) | P3 | S | 002, 005 | SUPERSEDED / DEFERRED — never built as written |
+| 011 | Open-source launch: GitHub remote, npm publish, install paths | P2 | M | 001 (Part A); 001–009 (Part B) | PARTIAL — remote exists; full OSS launch not campaign scope |
+| 012 | Website brand brief: HERALD voice, positioning, family contrast | P3 | M | — | TODO (docs-only; not campaign scope) |
+| 013 | Agent-hierarchy awareness (curtain shipped; statusline + tmux bar) | P1 | M | 005 | PARTIAL — curtain half DONE; statusline/tmux-bar halves → 017+ |
+| 014 | Curtain themes, per-session binding, animated ASCII art, transparent bg | P2 | M | 005, 013 | DONE (landed; quality-revision Phase 1) |
+| 015 | Event-driven curtain focus (Mac Hammerspoon → Manjaro SSH stream) | P2 | M | 013, 014 | DONE (landed; quality-revision Phase 2) |
+| 016 | Curtain anim polish (done/compacting) + visible-only perf gate + rename-safe card + tmux-bar transparent coupling | P2 | M | 013, 014 | DONE (landed; quality-revision Phase 2) — was SPEC in index |
+| 017 | Herald-native status bars (program / Slice 2) | P1 | XL | curtain | SPEC (program umbrella) |
+| 018 | Status engine (segments, roles, width-drop) | P1 | M | 017 | DONE (landed; quality-revision Phase 3) |
+| 019 | Status compute + bridges | P1 | M | 018 | DONE (landed; quality-revision Phase 3) |
+| 020 | Status surfaces wiring | P1 | L | 019 | DONE (landed; cutover is 021) |
+| 024 | Denizens motion base (driftField particles + one-motion-language bars) | P1 | M | curtain (024 standalone) | DONE (feat/herald-denizens; T1–T7, 468/468, render-verified) |
+| 025 | Denizens entities (per-session reactive creatures, seed funnel, tiers) | P2 | L | 024 | PLAN |
+| 026 | Denizens bestiary + config (8 species, validateDenizen, config gate) | P2 | M | 025 | PLAN |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
-REJECTED (with one-line rationale)
+REJECTED (with one-line rationale) | SUPERSEDED | PARTIAL | FROZEN
+
+## Quality revision (2026-07)
+
+Landed plans **013–019** completed a Grok 4.5 **revise-executed** campaign (closed)
+(`docs/superpowers/specs/2026-07-13-herald-plan-quality-revision-design.md`,
+`plans/revision-README.md`). Plan **020** may resume — quality-revision campaign closed with green light.
+Do not treat this table’s DONE as “never audit” — DONE means shipped enough to
+revise, not “perfect.”
+
+## Denizens program (2026-07-18)
+
+Plans **024–026** implement the Denizens design
+(`docs/superpowers/specs/2026-07-18-herald-denizens-design.md`): coherent
+particles (fix the `sparkRain` flicker), per-session reactive ASCII creatures
+(deterministic per tab, responsive tiers), and one unified state hue/period
+across curtain + tmux + Claude bar. Read
+`docs/superpowers/plans/2026-07-18-denizens-RECONCILE.md` for authoritative
+overrides (tier geometry, Claude-bar contrast). 024 ships independent value
+(flicker + bar-mismatch fixes) and does not depend on 025/026.
 
 ## Dependency notes
 
@@ -56,7 +87,17 @@ REJECTED (with one-line rationale)
 - **009 last among the buildout** — it documents shipped behavior and
   executes README examples against the real CLI.
 - **010 anytime** after 005; its report seeds the next planning round
-  (plans 011+).
+  (plans 012+).
+- **011 splits**: Part A (GitHub remote + settings) can run right after
+  001 — early push turns CI on for every later plan's branch and makes the
+  README badges real. Part B (npm publish) strictly after 009 — the README
+  is the npm product page; never publish the Plan 001 skeleton.
+- **012 anytime** — document-only (no code deps); produces
+  `docs/brand/BRIEF.md`, the brand foundation for the future
+  `status-herald-site` repo (brief → explorations → assembly, the
+  agentic-sage-site process). Its copy is drafted from the plan set and
+  must be re-verified against shipped reality at site-build time; the
+  actual site explorations are future plans in the site repo, not here.
 
 ## Design decisions (recorded so nobody re-litigates)
 
@@ -81,6 +122,11 @@ REJECTED (with one-line rationale)
   (no external write API). No third naming scheme invented.
 - **Fail-open everywhere on render paths** — empty output + exit 0 beats an
   error in a status bar (agentic-sage's statusline stance).
+- **Distribution: npm registry only in v1** — `npm i -g status-herald` is
+  the primary install (global-install decision above); `npx status-herald`
+  comes free as the zero-install trial path. pip is N/A (Node project);
+  Homebrew/AUR/single-binary wait for demand (Plan 011 records the
+  revisit triggers).
 
 ## Findings considered and rejected
 

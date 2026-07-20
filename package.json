@@ -1,6 +1,6 @@
 {
   "name": "status-herald",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "HERALD — heads-up engine for terminal status surfaces",
   "type": "module",
   "bin": { "herald": "bin/herald" },

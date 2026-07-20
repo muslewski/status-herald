@@ -1,0 +1,8 @@
+{
+  "pid": 999999,
+  "sessionId": "test-sid-1234",
+  "cwd": "/tmp/testrepo",
+  "name": "Test",
+  "status": "busy",
+  "statusUpdatedAt": 1783950000000
+}

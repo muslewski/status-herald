@@ -1,0 +1,21 @@
+[Unit]
+Description=status-herald per-tab curtain focus agent (dispatcher: poll or event stream)
+After=network-online.target
+
+[Service]
+Type=simple
+# The systemd user PATH is not your shell PATH: it has no nvm/asdf/volta, so
+# `herald` (and the `node` its shebang needs) will not be found. Either symlink
+# both into ~/.local/bin, or uncomment and adjust the line below.
+#Environment=PATH=%h/.nvm/versions/node/v22.12.0/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStartPre=/usr/bin/env herald curtain arm-all
+ExecStart=/usr/bin/env bash %h/.local/share/status-herald/run.sh
+# Do NOT ExecStopPost=reveal-all here. Restart=on-failure runs the stop sequence
+# before each restart, which would flash every card mid-blip. Graceful teardown
+# is owned by the adapters: poll reveal-all on clean exit; stream holds state.
+# Operator can `herald curtain reveal-all` manually after a hard kill if needed.
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

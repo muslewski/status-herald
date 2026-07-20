@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "generated_at": 1783950000,
+  "windows": [
+    {
+      "window": "five_hour",
+      "used": 7011000,
+      "cap": 57000000,
+      "projected_pct": 12.3,
+      "eta_to_cap_secs": null,
+      "reset_in_secs": 50000,
+      "idle": false,
+      "confidence": 0.9
+    },
+    {
+      "window": "seven_day",
+      "used": 121500000,
+      "cap": 270000000,
+      "projected_pct": 45.0,
+      "eta_to_cap_secs": null,
+      "reset_in_secs": 1050000,
+      "idle": false,
+      "confidence": 0.85
+    }
+  ]
+}

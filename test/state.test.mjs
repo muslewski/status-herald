@@ -29,5 +29,7 @@ test("computeElapsed subtracts and floors at 0", () => {
 test("isState validates", () => {
   assert.equal(isState("working"), true);
   assert.equal(isState(STATES.DONE), true);
+  assert.equal(isState(STATES.COMPACTING), true);
+  assert.equal(isState("compacting"), true);
   assert.equal(isState("bogus"), false);
 });
