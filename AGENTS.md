@@ -167,6 +167,8 @@ See README "Config reference". Curtain works the same regardless of agent.
 | `@herald_model_hint` | Env-derived model@effort fallback |
 | `@herald_settle_ts` | Last settle tick (doctor RC3) |
 | `@herald_paused` | `1` = hold curtain open (no auto-cover) until resume |
+| `@herald_entity` | Denizen species (fox/cat/owl…), stamped once at arm |
+| `@herald_seed` | uint32 seed for particles + denizen phase offset |
 | `@herald_state` / `@herald_since` / `@herald_last_active` / `@herald_covered` / `@herald_worked` | Unchanged |
 
 Legacy per-kind counters and the old task-list flag are gone — full migration list is in `CHANGELOG.md` (Unreleased).

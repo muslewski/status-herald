@@ -64,6 +64,12 @@ Re-arm after upgrade: `herald curtain disarm && herald curtain arm` (or
   - `herald curtain pause [session]` / `resume [session]`
   - `herald curtain pause-all` / `resume-all`
   - Session opt `@herald_paused=1`; still armed (hooks keep stamping state).
+- **Denizens P2 — per-session creatures** (fox / cat / owl):
+  - Deterministic species + seed stamped at `arm` (`@herald_entity`,
+    `@herald_seed`); card loop passes `--entity`/`--seed`.
+  - Reactive poses by `@herald_state`; full (≤5×12) / compact (≤3×8) tiers
+    (RECONCILE R1); `none` when card too small.
+  - Whitespace-only composite (art sacred); classic + motion-off unchanged.
 - **Denizens P1 — coherent particles + one motion language**
   (`docs/superpowers/specs/2026-07-18-herald-denizens-design.md`):
   - `driftField` particle engine (coordinate-only mote identity + continuous

@@ -7,6 +7,7 @@ import {
   coverageRatio,
   drawFrameMs,
   driftField,
+  mergeDenizen,
   motionDisabled,
   selectEffects,
   stageCurtain,
@@ -279,4 +280,37 @@ test("applyTheatrics DONE burst decays across ticks (no 5-frame hard clear)", ()
   assert.ok(ink(early) > 0, "burst present at t0");
   assert.ok(ink(late) < ink(early), "burst decays, not a hard clear");
   assert.match(early.join(""), /[*.+·]/, "burst uses spark glyph family");
+});
+
+test("mergeDenizen paints into whitespace only; base ink wins", () => {
+  const base = ["#######", "       ", "       "];
+  const cel = ["/\\_ _/\\".slice(0, 7), "(o.o)/~", "  ~^~  "];
+  const out = mergeDenizen(base, cel, { top: 0, left: 0 });
+  assert.equal(out[0], "#######", "base ink survives");
+  assert.match(out[1], /o\.o/, "cel glyphs where base was space");
+});
+
+test("mergeDenizen respects zone offset and preserves line count", () => {
+  const out = mergeDenizen(["          ", "          "], ["ab"], {
+    top: 1,
+    left: 3,
+  });
+  assert.equal(out.length, 2);
+  assert.equal(out[1][3], "a");
+  assert.equal(out[1][4], "b");
+  assert.equal(out[0].trim(), "");
+});
+
+test("mergeDenizen no-op on empty/absent cel", () => {
+  assert.deepEqual(mergeDenizen(["xx"], [], {}), ["xx"]);
+  assert.deepEqual(mergeDenizen(["xx"], null, {}), ["xx"]);
+});
+
+test("mergeDenizen may cover particle motes but not theme ink", () => {
+  const base = ["=======", "·······", "       "];
+  const cel = ["XXXXXXX", "XXXXXXX", "XXXXXXX"];
+  const out = mergeDenizen(base, cel, { top: 0, left: 0 });
+  assert.equal(out[0], "=======", "theme art sacred");
+  assert.equal(out[1], "XXXXXXX", "motes soft — denizen visible");
+  assert.equal(out[2], "XXXXXXX");
 });

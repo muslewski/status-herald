@@ -68,6 +68,8 @@ while :; do
   draw=${O[@herald_draw]:-}
   draw_ms=${O[@herald_draw_ms]:-75}
   draw_frames=${O[@herald_draw_frames]:-8}
+  entity=${O[@herald_entity]:-}
+  seed=${O[@herald_seed]:-0}
   # settleAfter is relative to state entry: a monotonic tick from arm freezes
   # DONE/COMPACTING animation after a long WORKING session. Reset on change so
   # the first paint of the new state uses tick 0.
@@ -98,6 +100,7 @@ while :; do
     --leases "${leases:-}" \
     --worked "${worked:-0}" \
     --theme "${theme:-classic}" --tick "$tick" \
+    --entity "${entity:-}" --seed "${seed:-0}" \
     --cols "$cols" --rows "$rows" --color always \
     "${draw_flags[@]}" 2>/dev/null || true
   tick=$((tick + 1))

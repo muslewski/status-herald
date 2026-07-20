@@ -1,6 +1,6 @@
 # Plan 025 — Denizens entities (executable)
 
-**Status:** PLAN (ready to execute)
+**Status:** DONE (feat/denizens-p2; fox/cat/owl + seed funnel + mergeDenizen)
 **Spec:** `docs/superpowers/specs/2026-07-18-herald-denizens-design.md`
 **Full task plan:** `docs/superpowers/plans/2026-07-18-denizens-p2-denizens.md`
 **Reconciliation (authoritative overrides):** `docs/superpowers/plans/2026-07-18-denizens-RECONCILE.md`
