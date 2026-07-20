@@ -2441,3 +2441,34 @@ test("arm resets paused flag", () => {
   arm("s1", t);
   assert.equal(t.getSessOpt("s1", "@herald_paused"), "0");
 });
+
+test("arm stamps a deterministic entity + seed", () => {
+  const t = makeT(freshSession());
+  arm("s1", t);
+  const e = t.getSessOpt("s1", "@herald_entity");
+  assert.ok(e.length > 0);
+  assert.match(t.getSessOpt("s1", "@herald_seed"), /^[0-9]+$/);
+});
+
+test("arm entity/seed reproduce for the same name", () => {
+  const t1 = makeT(freshSession());
+  const t2 = makeT(freshSession());
+  arm("s1", t1);
+  arm("s1", t2);
+  assert.equal(
+    t1.getSessOpt("s1", "@herald_entity"),
+    t2.getSessOpt("s1", "@herald_entity"),
+  );
+  assert.equal(
+    t1.getSessOpt("s1", "@herald_seed"),
+    t2.getSessOpt("s1", "@herald_seed"),
+  );
+});
+
+test("arm is idempotent for entity too", () => {
+  const t = makeT(freshSession());
+  arm("s1", t);
+  t.setSessOpt("s1", "@herald_entity", "sentinel");
+  arm("s1", t);
+  assert.equal(t.getSessOpt("s1", "@herald_entity"), "sentinel");
+});

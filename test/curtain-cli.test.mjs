@@ -146,3 +146,53 @@ test("curtain status uses session-scoped @herald_state (not pane getOpt alone)",
     "must not read @herald_state via pane getOpt",
   );
 });
+
+// biome-ignore lint/suspicious/noControlCharactersInRegex: strip SGR for glyph asserts
+const plainOut = (s) => s.replace(/\x1b\[[0-9;]*m/g, "");
+
+test("runRender parses --entity/--seed into theatrics (fox glyphs render)", () => {
+  const { status, stdout } = run([
+    "render",
+    "--surface",
+    "curtain-card",
+    "--state",
+    "working",
+    "--theme",
+    "forge",
+    "--cols",
+    "60",
+    "--rows",
+    "20",
+    "--tick",
+    "0",
+    "--entity",
+    "fox",
+    "--seed",
+    "0",
+  ]);
+  assert.equal(status, 0);
+  const text = plainOut(stdout);
+  assert.match(text, /o\.o|\^\.\^|\/\\_\/\\|> \^ </);
+});
+
+test("curtain-card-session.sh threads @herald_entity/@herald_seed as flags", () => {
+  const src = readFileSync(
+    join(
+      dirname(fileURLToPath(import.meta.url)),
+      "../scripts/curtain-card-session.sh",
+    ),
+    "utf8",
+  );
+  assert.match(src, /@herald_entity/);
+  assert.match(src, /--entity/);
+  assert.match(src, /--seed/);
+});
+
+test("cli.mjs runRender reads f.entity/f.seed", () => {
+  const src = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), "../lib/cli.mjs"),
+    "utf8",
+  );
+  assert.match(src, /entity: f\.entity/);
+  assert.match(src, /seed: Number\(f\.seed\)/);
+});

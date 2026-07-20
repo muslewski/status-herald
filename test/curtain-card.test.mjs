@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { test } from "node:test";
+import { tierFor } from "../lib/curtain/denizens.mjs";
 import { BUILTINS } from "../lib/curtain/themes.mjs";
 import {
   infoLines,
@@ -671,4 +672,118 @@ test("resolveModelLine records beat hint; disabled yields empty", async () => {
     resolveModelLine({ enabled: true, modelHint: "hint-only" }),
     "hint-only",
   );
+});
+
+// --- Denizens P2 ---
+const den = (over = {}) => ({
+  themeName: "forge",
+  animCfg: { enabled: true },
+  entity: "fox",
+  seed: 0,
+  ...over,
+});
+
+test("forge working card renders a denizen into whitespace", () => {
+  const out = renderCard("working", 5, 60, 20, {}, BUILTINS.forge, 0, den())
+    .map(plain)
+    .join("\n");
+  assert.match(out, /=======/, "anvil art still present");
+  assert.match(out, /o\.o|\^\.\^|~\^~|> \^ <|\/\\_\/\\/, "fox glyphs present");
+});
+
+test("denizen never overwrites base art (art sacred)", () => {
+  const out = renderCard("working", 5, 60, 20, {}, BUILTINS.forge, 0, den())
+    .map(plain)
+    .join("\n");
+  assert.match(out, /\|###\|/);
+  assert.match(out, /=======/);
+});
+
+test("classic ignores entity/seed (byte-identical)", () => {
+  const base = renderCard("working", 5, 60, 20, {}, BUILTINS.classic, 0)
+    .map(plain)
+    .join("\n");
+  const withEnt = renderCard("working", 5, 60, 20, {}, BUILTINS.classic, 0, {
+    themeName: "classic",
+    animCfg: { enabled: true },
+    entity: "fox",
+    seed: 3,
+  })
+    .map(plain)
+    .join("\n");
+  assert.equal(withEnt, base);
+});
+
+test("renderCard keeps exact geometry with a denizen", () => {
+  const lines = renderCard("working", 5, 60, 20, {}, BUILTINS.forge, 0, den());
+  assert.equal(lines.length, 20);
+  for (const line of lines.map(plain)) {
+    assert.ok(line.length <= 60, `line width ${line.length}`);
+  }
+});
+
+test("too-small card degrades: no denizen glyphs", () => {
+  // RECONCILE R1: none when rows < 5 || cols < 11
+  assert.equal(tierFor(4, 12), "none");
+  assert.equal(tierFor(5, 10), "none");
+  const tiny = renderCard("working", 5, 10, 4, {}, BUILTINS.forge, 0, den())
+    .map(plain)
+    .join("\n");
+  assert.doesNotMatch(tiny, /o\.o/);
+});
+
+test("motion-off freezes denizen to cel 0", () => {
+  // Theme art may still flip; denizen itself is frozen at tick 0.
+  // fox working full frame0 has "( o.o )~"; frame1 has "( o.o)~ " (tail side flip).
+  const opts = den({ animCfg: { enabled: false } });
+  const a = renderCard("working", 5, 60, 20, {}, BUILTINS.forge, 0, opts)
+    .map(plain)
+    .join("\n");
+  const b = renderCard("working", 5, 60, 20, {}, BUILTINS.forge, 5, opts)
+    .map(plain)
+    .join("\n");
+  assert.match(a, /\( o\.o \)~/);
+  assert.match(b, /\( o\.o \)~/);
+  // Unfrozen would use tick%2 → frame1 at tick 5 with seed 0
+  const live = renderCard(
+    "working",
+    5,
+    60,
+    20,
+    {},
+    BUILTINS.forge,
+    5,
+    den({ animCfg: { enabled: true } }),
+  )
+    .map(plain)
+    .join("\n");
+  assert.match(live, /\( o\.o\)~/);
+});
+
+test("seed phase-offsets co-launched tabs", () => {
+  const s0 = renderCard(
+    "working",
+    5,
+    60,
+    20,
+    {},
+    BUILTINS.forge,
+    0,
+    den({ seed: 0 }),
+  )
+    .map(plain)
+    .join("\n");
+  const s1 = renderCard(
+    "working",
+    5,
+    60,
+    20,
+    {},
+    BUILTINS.forge,
+    0,
+    den({ seed: 1 }),
+  )
+    .map(plain)
+    .join("\n");
+  assert.notEqual(s0, s1);
 });
