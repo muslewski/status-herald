@@ -24,6 +24,20 @@ Heads-up engine for terminal status surfaces.
 
 <p align="center"><img src="./assets/demo-curtain.gif" width="720" alt="herald curtain stage-draw demo"></p>
 
+### Curtain denizens
+
+Non-classic themes put a **per-session creature** on the card — fox, cat, or owl — instead of a static mallet. Same animal every time for a given tmux session name; a grid of panes becomes a little cast.
+
+```
+   /\_/\         /\_/\           ,___,
+  ( o.o )       (=^.^=)         ( o,o )
+   > ^ <         (   )         /)   (\
+    ~~~          |   |           "-"
+    fox           cat            owl
+```
+
+Full lore, poses, and config: **[docs/BESTIARY.md](./docs/BESTIARY.md)**.
+
 ## Curtain (phase 1)
 
 Covers a working agent session pane (Claude Code, Grok Build, etc.) in a tmux

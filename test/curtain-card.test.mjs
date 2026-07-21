@@ -796,7 +796,7 @@ test("too-small card degrades: no denizen glyphs", () => {
 
 test("motion-off freezes denizen to cel 0", () => {
   // Theme art may still flip; denizen itself is frozen at tick 0.
-  // fox working full frame0 has "( o.o )~"; frame1 has "( o.o)~ " (tail side flip).
+  // fox working full: frame0 feet "~~~", frame1 feet "~ ~ ~"
   const opts = den({ animCfg: { enabled: false } });
   const a = renderCard("working", 5, 60, 20, {}, BUILTINS.forge, 0, opts)
     .map(plain)
@@ -804,9 +804,11 @@ test("motion-off freezes denizen to cel 0", () => {
   const b = renderCard("working", 5, 60, 20, {}, BUILTINS.forge, 5, opts)
     .map(plain)
     .join("\n");
-  assert.match(a, /\( o\.o \)~/);
-  assert.match(b, /\( o\.o \)~/);
-  // Unfrozen would use tick%2 → frame1 at tick 5 with seed 0
+  assert.match(a, /\( o\.o \)/);
+  assert.match(a, /~~~/);
+  assert.match(b, /\( o\.o \)/);
+  assert.match(b, /~~~/, "frozen on frame0 feet, not frame1 ~ ~ ~");
+  // Unfrozen tick 5 + seed 0 → frame1
   const live = renderCard(
     "working",
     5,
@@ -819,7 +821,8 @@ test("motion-off freezes denizen to cel 0", () => {
   )
     .map(plain)
     .join("\n");
-  assert.match(live, /\( o\.o\)~/);
+  assert.match(live, /\( o\.o \)/);
+  assert.match(live, /~ ~ ~/);
 });
 
 test("seed phase-offsets co-launched tabs", () => {
