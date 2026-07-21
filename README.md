@@ -5,6 +5,14 @@
   <a href="https://herald.muslewski.com"><img src="https://img.shields.io/badge/website-herald.muslewski.com-c9a227?style=flat-square&labelColor=000" alt="Website"></a>
 </p>
 
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/status-herald"><img src="https://img.shields.io/npm/v/status-herald?style=flat-square" alt="npm"></a>
+  <a href="https://github.com/muslewski/status-herald/discussions"><img src="https://img.shields.io/badge/discussions-join-c9a227?style=flat-square" alt="Discussions"></a>
+  <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT">
+  <img src="https://img.shields.io/badge/node-%3E%3D20-blue?style=flat-square" alt="Node">
+</p>
+
 <p align="center">
   <a href="https://herald.muslewski.com"><img src="https://raw.githubusercontent.com/muslewski/status-herald-website/main/public/posters/v01.jpg" alt="HERALD spotlight plate" width="720"></a>
 </p>
@@ -409,3 +417,15 @@ tmux set -t syndcast @herald_state working
 ssh <box> herald curtain cover syndcast   # flip to the syndcast tab -> card
 ssh <box> herald curtain reveal syndcast  # -> live session
 ```
+
+## Community
+
+- **Website:** [herald.muslewski.com](https://herald.muslewski.com)
+- **Questions & ideas:** [Discussions](https://github.com/muslewski/status-herald/discussions)
+- **Bugs & features:** [Issues](https://github.com/muslewski/status-herald/issues/new/choose)
+- **Contributing:** [CONTRIBUTING.md](./CONTRIBUTING.md)
+- **Code of Conduct:** [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)
+- **Security:** [SECURITY.md](./SECURITY.md) (private reports only)
+- **Support matrix:** [SUPPORT.md](./SUPPORT.md)
+
+If you're not sure whether something is a bug, **start a Discussion** — maintainers can promote it to an issue when it is.
