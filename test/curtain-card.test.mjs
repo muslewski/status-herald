@@ -185,6 +185,27 @@ test("CLI render selects the themed frame by --theme and --tick", () => {
   assert.match(run("classic", 7), /WORKING/);
 });
 
+test("infoLines includes tmux session name when provided", () => {
+  const lines = infoLines("working", {
+    elapsed: 42,
+    subagents: 0,
+    shells: 0,
+    watchers: 0,
+    worked: 0,
+    sessionName: "grid-a",
+  });
+  assert.ok(lines.includes("grid-a"), `expected session name in ${lines}`);
+});
+
+test("renderCard paints session name on working card", () => {
+  const text = renderCard("working", 12, 60, 12, {
+    sessionName: "my-sess",
+  })
+    .map(plain)
+    .join("\n");
+  assert.match(text, /my-sess/);
+});
+
 test("classic renderCard output is unchanged when theme/tick default", () => {
   // The existing tests above already assert classic content; this pins that
   // passing an explicit classic theme + tick 0 yields the same lines.

@@ -95,12 +95,15 @@ while :; do
   if [ "$draw" = "shut" ] || [ "$draw" = "open" ]; then
     draw_flags=(--draw "$draw" --draw-tick "$draw_tick")
   fi
+  # Session name for the card label (prefix+$ renames show up next tick).
+  sess_name=$(tmux display -p '#{session_name}' 2>/dev/null || true)
   herald render --surface curtain-card \
     --state "${state:-idle}" --since "${since:-0}" \
     --leases "${leases:-}" \
     --worked "${worked:-0}" \
     --theme "${theme:-classic}" --tick "$tick" \
     --entity "${entity:-}" --seed "${seed:-0}" \
+    --session "${sess_name:-}" \
     --cols "$cols" --rows "$rows" --color always \
     "${draw_flags[@]}" 2>/dev/null || true
   tick=$((tick + 1))
