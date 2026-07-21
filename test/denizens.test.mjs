@@ -5,6 +5,8 @@ import {
   ROSTER,
   denizenCel,
   hashStr,
+  inkBounds,
+  placeDenizen,
   seedFor,
   speciesFor,
   tierFor,
@@ -95,6 +97,44 @@ test("denizenCel frame folds seed phase offset", () => {
     }),
     t0s0,
   );
+});
+
+test("inkBounds tracks non-space silhouette, not pad box", () => {
+  const cel = ["  /\\_/\\  ", " (=^.^=) ", "  (   )  "];
+  const b = inkBounds(cel);
+  assert.ok(b);
+  assert.equal(b.minC, 1); // leading spaces
+  assert.ok(b.inkW < 9, "ink narrower than padded line");
+});
+
+test("placeDenizen centers cat ink on card midline", () => {
+  const cel = denizenCel({
+    species: "cat",
+    state: "working",
+    tier: "full",
+    tick: 0,
+    seed: 1,
+  });
+  const cols = 60;
+  const { top, left, cel: cropped } = placeDenizen(cel, cols, 24);
+  assert.ok(cropped.length >= 3);
+  // Reconstruct where ink lands on the card
+  let min = Infinity;
+  let max = -1;
+  for (const line of cropped) {
+    for (let i = 0; i < line.length; i++) {
+      if (line[i] === " ") continue;
+      const col = left + i;
+      if (col < min) min = col;
+      if (col > max) max = col;
+    }
+  }
+  const mid = (min + max) / 2;
+  assert.ok(
+    Math.abs(mid - (cols - 1) / 2) < 1.1,
+    `ink mid ${mid} should be near screen mid ${(cols - 1) / 2}`,
+  );
+  assert.ok(top >= 0);
 });
 
 test("denizenCel fail-open", () => {
