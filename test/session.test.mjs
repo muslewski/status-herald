@@ -471,10 +471,10 @@ test("id-set: same-id SubagentStarts are idempotent, distinct ones stack", () =>
   assert.equal(liveAt(t).subagent, 2);
 });
 
-test("id-set: a Stop task list reconciles a leaked synthesized count", () => {
-  // Grok-style: two SubagentStarts synthesize a count of 2, but their Stops are
-  // dropped. A later Grok Stop (no task list) must overwrite the leak via RC1.
-  // Claude Stop with empty background_tasks is intentionally NOT trusted to wipe.
+test("id-set: Grok Stop does not wipe live subagent leases (false-DONE fix)", () => {
+  // Main turn Stop while kids still run must stay WORKING. Leaks age out via
+  // lease TTL / settleSynthLeakSec, not via Stop wipe (syndcast 17-kid bug).
+  // Timestamps within subagent TTL (300s) so leases stay live.
   const t = makeT(freshSession());
   t.sessionOf = () => "s1";
   const start = (id) => ({
@@ -484,11 +484,11 @@ test("id-set: a Stop task list reconciles a leaked synthesized count", () => {
     subagents: 0,
     shells: 0,
     subagentIds: [],
+    sourceCli: "grok",
   });
   stampFromHook("%9", start("g1"), 1000, t);
   stampFromHook("%9", start("g2"), 1001, t);
-  assert.equal(liveAt(t).subagent, 2, "leaked to 2");
-  // Grok Stop (hasTasks false) reconciles synth subagents to empty:
+  assert.equal(liveAt(t, 1001).subagent, 2, "two kids");
   stampFromHook(
     "%9",
     {
@@ -497,28 +497,30 @@ test("id-set: a Stop task list reconciles a leaked synthesized count", () => {
       subagents: 0,
       shells: 0,
       subagentIds: [],
+      sourceCli: "grok",
     },
-    2000,
+    1010,
     t,
   );
-  assert.equal(liveAt(t).subagent, 0, "reconciled");
-  assert.equal(t.getSessOpt("s1", "@herald_state"), "done");
+  assert.equal(liveAt(t, 1010).subagent, 2, "Stop must not wipe kids");
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "working");
 });
 
-test("Grok Stop without task list reconciles synth subagents to empty → DONE", () => {
+test("Grok Stop without live kids → DONE", () => {
   const t = makeT(freshSession());
   t.sessionOf = () => "s1";
-  const start = (id) => ({
-    event: "SubagentStart",
-    agentId: id,
-    hasTasks: false,
-    subagents: 0,
-    shells: 0,
-    subagentIds: [],
-  });
-  stampFromHook("%9", start("g1"), 1000, t);
-  stampFromHook("%9", start("g2"), 1001, t);
-  assert.equal(liveAt(t, 1001).subagent, 2);
+  stampFromHook(
+    "%9",
+    {
+      event: "UserPromptSubmit",
+      hasTasks: false,
+      synthetic: false,
+      sourceCli: "grok",
+    },
+    1000,
+    t,
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "working");
   stampFromHook(
     "%9",
     {
@@ -527,12 +529,13 @@ test("Grok Stop without task list reconciles synth subagents to empty → DONE",
       subagents: 0,
       shells: 0,
       subagentIds: [],
+      sourceCli: "grok",
     },
-    2000,
+    1010,
     t,
   );
   assert.equal(t.getSessOpt("s1", "@herald_state"), "done");
-  assert.equal(liveAt(t, 2000).subagent, 0);
+  assert.equal(liveAt(t, 1010).subagent, 0);
 });
 
 test("Grok: last SubagentStop with zero synth ids settles to DONE (no idle_prompt)", () => {
@@ -1977,8 +1980,8 @@ test("SubagentStop with empty inflight list still reconciles to empty", () => {
   assert.equal(liveAt(t, 1100).subagent, 0);
 });
 
-test("Grok Stop (no tasks) still reconciles subagents to empty", () => {
-  // RC1 unchanged: hasTasks false + Stop clears synth subagents.
+test("Grok Stop (no tasks) keeps live subagent leases and WORKING", () => {
+  // Former RC1 wiped kids on every main-turn Stop → false DONE on fleets.
   const t = makeT(freshSession());
   t.sessionOf = () => "s1";
   stampFromHook(
@@ -1990,6 +1993,7 @@ test("Grok Stop (no tasks) still reconciles subagents to empty", () => {
       subagents: 0,
       shells: 0,
       subagentIds: [],
+      sourceCli: "grok",
     },
     1000,
     t,
@@ -2003,12 +2007,49 @@ test("Grok Stop (no tasks) still reconciles subagents to empty", () => {
       subagents: 0,
       shells: 0,
       subagentIds: [],
+      sourceCli: "grok",
     },
-    2000,
+    1050,
     t,
   );
-  assert.equal(liveAt(t, 2000).subagent, 0);
-  assert.equal(t.getSessOpt("s1", "@herald_state"), "done");
+  assert.equal(liveAt(t, 1050).subagent, 1);
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "working");
+});
+
+test("Grok spawn_subagent PreToolUse grants a subagent lease without SubagentStart", () => {
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  stampFromHook(
+    "%9",
+    {
+      event: "PreToolUse",
+      toolName: "spawn_subagent",
+      hasTasks: false,
+      sourceCli: "grok",
+      agentId: "",
+      toolTaskId: "",
+    },
+    1000,
+    t,
+  );
+  assert.equal(liveAt(t, 1000).subagent, 1);
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "working");
+  stampFromHook(
+    "%9",
+    {
+      event: "Stop",
+      hasTasks: false,
+      sourceCli: "grok",
+    },
+    1015,
+    t,
+  );
+  assert.equal(
+    t.getSessOpt("s1", "@herald_state"),
+    "working",
+    "spawn lease holds past main Stop",
+  );
+  assert.equal(liveAt(t, 1015).subagent, 1);
 });
 
 test("monitor-sandwich lifecycle: heartbeats heal past old TTL; empty Stop keeps fleet; SubagentStop settles", () => {

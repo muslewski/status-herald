@@ -114,8 +114,9 @@ another event — the card fails **idle**, not stuck-working:
 
 - **live subagent leases** at `Stop` → stays `● WORKING · 2 subagents` when the
   host still reports them (Claude task list). A subagent keeps you from acting.
-  On Grok (synthesis hosts) `Stop` reconciles subagent leases empty, then
-  settles to `DONE` unless a watcher lease is still live.
+  On Grok (synthesis hosts) main-turn `Stop` does **not** wipe live subagent
+  leases — kids keep `WORKING` until they drain (SubagentStop) or lease TTL /
+  leak settle fires.
 - **live watcher leases** (`/loop`, `scheduler_create`, `monitor`) at `Stop` →
   stays `● WORKING` until the watcher ends or its TTL expires (default 900s).
   Watchers no longer block settle forever.
