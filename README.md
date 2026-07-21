@@ -1,5 +1,17 @@
 # status-herald (HERALD)
 
+
+<p align="center">
+  <a href="https://herald.muslewski.com"><img src="https://img.shields.io/badge/website-herald.muslewski.com-c9a227?style=flat-square&labelColor=000" alt="Website"></a>
+</p>
+
+<p align="center">
+  <a href="https://herald.muslewski.com"><img src="https://raw.githubusercontent.com/muslewski/status-herald-website/main/public/posters/v01.jpg" alt="HERALD spotlight plate" width="720"></a>
+</p>
+
+<p align="center"><b>Site:</b> <a href="https://herald.muslewski.com">herald.muslewski.com</a></p>
+
+
 Heads-up engine for terminal status surfaces.
 
 <p align="center"><img src="./assets/demo-curtain.gif" width="720" alt="herald curtain stage-draw demo"></p>
