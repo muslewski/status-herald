@@ -24,9 +24,18 @@ grid with an opaque status card; focus a card to open the live session.
 ### Install
 
 ```bash
+npm install -g status-herald   # or: npx status-herald …
+# bins: herald | status-herald
+herald curtain install         # wire hooks (~/.claude/settings.json for Claude + Grok compat)
+herald curtain doctor
+```
+
+From a git checkout (dev):
+
+```bash
 npm install            # dev deps only (biome); zero runtime deps
 npm link               # put `herald` on PATH
-herald curtain install # wire hooks (into ~/.claude/settings.json for Claude + Grok compat)
+herald curtain install
 ```
 
 `install` wires one payload-aware command onto `UserPromptSubmit`,
