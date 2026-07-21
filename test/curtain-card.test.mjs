@@ -704,20 +704,61 @@ const den = (over = {}) => ({
   ...over,
 });
 
-test("forge working card renders a denizen into whitespace", () => {
+test("forge working with denizen uses creature as main art (replaces hammer)", () => {
   const out = renderCard("working", 5, 60, 20, {}, BUILTINS.forge, 0, den())
     .map(plain)
     .join("\n");
-  assert.match(out, /=======/, "anvil art still present");
-  assert.match(out, /o\.o|\^\.\^|~\^~|> \^ <|\/\\_\/\\/, "fox glyphs present");
+  assert.doesNotMatch(out, /\|###\|/, "mallet/anvil replaced");
+  assert.doesNotMatch(out, /=======/, "anvil base replaced");
+  assert.match(out, /o\.o|\^\.\^|~\^~|> \^ <|\/\\_\/\\/, "creature glyphs present");
+  assert.match(out, /WORKING/);
 });
 
-test("denizen never overwrites base art (art sacred)", () => {
-  const out = renderCard("working", 5, 60, 20, {}, BUILTINS.forge, 0, den())
+test("forge without denizen still shows theme art", () => {
+  const out = renderCard("working", 5, 60, 20, {}, BUILTINS.forge, 0, {
+    themeName: "forge",
+    animCfg: { enabled: true },
+    entity: "",
+    seed: 0,
+  })
     .map(plain)
     .join("\n");
   assert.match(out, /\|###\|/);
   assert.match(out, /=======/);
+});
+
+test("denizen art is centered with WORKING label", () => {
+  const cols = 60;
+  const lines = renderCard(
+    "working",
+    5,
+    cols,
+    20,
+    {},
+    BUILTINS.forge,
+    0,
+    den({ entity: "cat" }),
+  ).map(plain);
+  const inkMid = (line) => {
+    let a = Infinity;
+    let b = -1;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (!ch || ch === " " || "·˙ʼ".includes(ch)) continue;
+      if (i < a) a = i;
+      if (i > b) b = i;
+    }
+    return b < 0 ? null : (a + b) / 2;
+  };
+  const catLine = lines.find((l) => l.includes("/\\_/\\"));
+  const labelLine = lines.find((l) => l.includes("WORKING"));
+  assert.ok(catLine && labelLine);
+  const cMid = inkMid(catLine);
+  const lMid = inkMid(labelLine);
+  assert.ok(
+    Math.abs(cMid - lMid) <= 2,
+    `cat mid ${cMid} vs label mid ${lMid}`,
+  );
 });
 
 test("classic ignores entity/seed (byte-identical)", () => {
