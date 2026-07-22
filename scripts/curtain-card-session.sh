@@ -29,6 +29,9 @@ herald() {
 }
 
 printf '\033[?25l'
+# Mouse tracking (SGR): corner chrome buttons (× off / ↻ pet) are clickable.
+# Restored on exit so we never leave the host terminal sticky.
+printf '\033[?1000h\033[?1002h\033[?1006h' 2>/dev/null || true
 # On exit, reveal — which (when tmuxBar coupling is on) restores the status bar,
 # so a killed loop can't strand the dropped background.
 # Skip when refreshCards is mid kill/recreate (@herald_refreshing=1); otherwise
@@ -38,6 +41,7 @@ printf '\033[?25l'
 # that returns continues the loop — after `tmux kill-window` the orphan keeps
 # painting a dead tty and fleets accumulate 100+ glitching card processes.
 cleanup() {
+  printf '\033[?1006l\033[?1002l\033[?1000l' 2>/dev/null || true
   s=$(tmux display -p "#{session_name}" 2>/dev/null)
   r=$(tmux show -t "$s" -v @herald_refreshing 2>/dev/null || true)
   [ "$r" = "1" ] || herald curtain reveal "$s" >/dev/null 2>&1 || true
@@ -49,6 +53,84 @@ trap 'exit 129' HUP
 tick=0
 draw_tick=0
 prev_draw=
+
+# Apply a chrome action (pause | pet). Returns 0 if handled.
+chrome_action() {
+  local act=$1 sess=$2
+  case "$act" in
+    pause)
+      # Hold curtain off for this session (stays armed; resume to re-enable).
+      herald curtain pause "$sess" >/dev/null 2>&1 || true
+      return 0
+      ;;
+    pet)
+      herald curtain pet "$sess" >/dev/null 2>&1 || true
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+# Read one input event within $1 seconds.
+# Sets: IN_KIND=timeout|key|click  IN_KEY=  IN_X=  IN_Y=
+read_event() {
+  local timeout=$1
+  IN_KIND=timeout
+  IN_KEY=
+  IN_X=
+  IN_Y=
+  local c n m ch seq b x y
+  if ! read -rsn1 -t "$timeout" c 2>/dev/null; then
+    return 1
+  fi
+  if [[ "$c" != $'\033' ]]; then
+    IN_KIND=key
+    IN_KEY=$c
+    return 0
+  fi
+  # Escape sequence — try SGR mouse: ESC [ < b ; x ; y M/m
+  read -rsn1 -t 0.02 n 2>/dev/null || { IN_KIND=key; IN_KEY=$'\033'; return 0; }
+  if [[ "$n" != '[' ]]; then
+    IN_KIND=key
+    IN_KEY=$'\033'
+    return 0
+  fi
+  read -rsn1 -t 0.02 m 2>/dev/null || { IN_KIND=key; IN_KEY=$'\033'; return 0; }
+  if [[ "$m" != '<' ]]; then
+    # Other CSI — drain briefly and treat as non-chrome key (reveal).
+    IN_KIND=key
+    IN_KEY=other
+    return 0
+  fi
+  seq=""
+  while read -rsn1 -t 0.05 ch 2>/dev/null; do
+    seq+="$ch"
+    if [[ "$ch" == "M" || "$ch" == "m" ]]; then
+      break
+    fi
+  done
+  # Only act on press (M), ignore release (m)
+  if [[ "$seq" != *M ]]; then
+    IN_KIND=timeout
+    return 1
+  fi
+  seq=${seq%M}
+  b=${seq%%;*}
+  rest=${seq#*;}
+  x=${rest%%;*}
+  y=${rest#*;}
+  # button 0 = left click (low 2 bits of b in basic protocol; SGR uses b directly)
+  # SGR: b=0 left press
+  if [[ "$b" != "0" && "$b" != "32" ]]; then
+    IN_KIND=timeout
+    return 1
+  fi
+  IN_KIND=click
+  IN_X=$x
+  IN_Y=$y
+  return 0
+}
+
 while :; do
   # One untargeted call dumps every option this repaint needs from the current
   # session. @herald_* values are single tokens, so `read -r k v` is safe.
@@ -135,16 +217,29 @@ while :; do
     "" | *[!0-9]*) secs=1 ;;
     *) secs=$(awk "BEGIN{printf \"%.3f\", $ms/1000}" 2>/dev/null || echo 1) ;;
   esac
-  if read -rsn1 -t "$secs" 2>/dev/null; then
-    # Keypress: play open theatrics when a non-classic theme is mid-cover;
-    # otherwise reveal immediately (fail-open).
+
+  if read_event "$secs"; then
     sess=$(tmux display -p '#{session_name}' 2>/dev/null)
-    if [ "${theme:-classic}" != "classic" ] && [ "$draw" != "open" ] && [ "$covered" = "1" ]; then
-      tmux set-option @herald_draw open 2>/dev/null || true
-      draw_tick=0
-      prev_draw=open
+    act=
+    if [ "$IN_KIND" = "click" ]; then
+      act=$(herald curtain chrome-hit --cols "${cols:-80}" --rows "${rows:-24}" \
+        --x "${IN_X:-0}" --y "${IN_Y:-0}" 2>/dev/null || true)
+    elif [ "$IN_KIND" = "key" ]; then
+      # Single-letter chrome shortcuts (x/o = off, a/p = pet). Else reveal.
+      act=$(herald curtain chrome-hit --key "${IN_KEY:-}" 2>/dev/null || true)
+    fi
+    if [ -n "$act" ] && chrome_action "$act" "$sess"; then
+      # pause already reveals; pet stays on card (next tick shows new animal)
+      :
     else
-      herald curtain reveal "$sess" >/dev/null 2>&1 || true
+      # Default: any other click/key opens the live pane (fail-open).
+      if [ "${theme:-classic}" != "classic" ] && [ "$draw" != "open" ] && [ "$covered" = "1" ]; then
+        tmux set-option @herald_draw open 2>/dev/null || true
+        draw_tick=0
+        prev_draw=open
+      else
+        herald curtain reveal "$sess" >/dev/null 2>&1 || true
+      fi
     fi
   fi
 done

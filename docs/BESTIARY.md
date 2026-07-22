@@ -92,6 +92,19 @@ Force a species (optional):
 }
 ```
 
+### Card chrome (click / keys)
+
+Bottom-right of every card (dim, low distraction):
+
+| Control | Click | Key | What it does |
+|---------|--------|-----|----------------|
+| **× off** | left-click | `x` or `o` | Pause curtain for this session (live pane stays visible; no auto-cover until `herald curtain resume`) |
+| **↻ pet** | left-click | `a` or `p` | Cycle animal fox → cat → owl |
+
+Needs a mouse-capable terminal + tmux mouse (or just use the keys).  
+More buttons can land in the same strip later.
+
+
 ---
 
 ## Stage rules (so they look right)
