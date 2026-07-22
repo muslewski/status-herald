@@ -8,6 +8,22 @@ are not soft-aliased (see design D3).
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-07-22
+
+First real feature release after the public `0.1.0` scaffold. Curtain cards
+grow a **bestiary** of denizens, clickable chrome, and the truth-lease settle
+model that was already documented under Unreleased.
+
+### Highlights
+
+- **Bestiary / denizens** — fox, cat, and owl assigned per tmux session; reactive
+  poses by curtain state; full + compact tiers; public lore in
+  [`docs/BESTIARY.md`](docs/BESTIARY.md).
+- **Clickable card chrome** — × off and ↻ pet on the curtain card.
+- **Truth leases** — fail-idle settle; watchers never hold `WORKING`.
+- **Pause / resume** — keep a session’s curtain open for copy/select without
+  the focus adapter re-covering the pane.
+
 ### Migration (breaking)
 
 #### Curtain settle — truth leases (fail-idle)
@@ -81,7 +97,7 @@ Re-arm after upgrade: `herald curtain disarm && herald curtain arm` (or
     accent, tmux tab glyph phase-cycle (`●◐○◑`), Claude WORKING chip → amber
     + dark ink (`38;5;232` on `48;5;214`) for WCAG contrast.
   - `theatrics.seed` threaded through render (defaults to 0 until P2 seed funnel).
-  - Entities / bestiary deferred: plans 025–026 (not in this release).
+  - Denizen species + public bestiary (see Highlights / BESTIARY.md).
 - Curtain **theatrics**: stage-curtain draw on cover, DONE rising burst,
   NEEDS breathe; `curtain.animation.enabled` / `reducedMotion` / stage-draw
   timing; motion-off + `classic` stay byte-identical to baseline.
