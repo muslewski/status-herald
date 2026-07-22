@@ -1,11 +1,13 @@
 name: Publish to npm
 
-# Manual or tag-driven. Needs repo secret NPM_TOKEN (same automation token as agentic-sage).
+# Canonical publish paths (no per-repo NPM_TOKEN required):
+#   1. Local:  ship-npm                 # or: ship-npm <pkg>  after ship-npm --setup
+#   2. Fleet:  gh workflow run "Fleet npm publish" -R muslewski/agentic-sage
+#              (only agentic-sage holds NPM_TOKEN; secrets are write-only)
+#
+# This workflow is manual-only so tag pushes do not fail red without a secret.
+# Prefer ship-npm / fleet over re-adding a tag trigger here.
 on:
-  push:
-    tags:
-      - 'v*'
-      - 'status-herald-v*'
   workflow_dispatch:
 
 permissions:
@@ -22,10 +24,17 @@ jobs:
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
-          cache: npm
 
-      - name: Install dependencies
-        run: npm install --ignore-scripts
+      - name: Require NPM_TOKEN (prefer ship-npm / fleet)
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "${NODE_AUTH_TOKEN}" ]; then
+            echo "::error::No NPM_TOKEN on this repo. Use one of:"
+            echo "  ship-npm                 # local, after ship-npm --setup"
+            echo "  gh workflow run 'Fleet npm publish' -R muslewski/agentic-sage"
+            exit 1
+          fi
 
       - name: Publish with provenance
         run: npm publish --provenance --access public
