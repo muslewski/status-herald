@@ -9,16 +9,15 @@ are not soft-aliased (see design D3).
 ## [Unreleased]
 
 
-## [0.2.2] — 2026-07-23
+## [0.2.3] — 2026-07-23
 
 ### Fixed
 
 - **Curtain stuck grey after `prefix+&` / kill-window**: when the last live
-  window dies and only `_curtain` remains, an `after-kill-window` hook now
-  kills the card so the session (and the grey curtain) die with the work.
-  Re-arm / `arm-all` installs the hook on already-armed sessions too.
-  Also sets `detach-on-destroy on` so clients leave cleanly when a session is
-  destroyed.
+  window dies and only `_curtain` remains, a session `window-unlinked` hook
+  (tmux 3.x — not `after-kill-window`, which does not exist) kills the card so
+  the session and grey curtain die with the work. Re-arm / `arm-all` refreshes
+  the hook. Also sets `detach-on-destroy on` for clean client exit.
 
 ## [0.2.1] — 2026-07-23
 
