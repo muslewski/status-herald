@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { countLive, parseLeases } from "../lib/curtain/lease.mjs";
 import {
   TITLE_FMT,
+  afterWindowKill,
   applySettle,
   applyWash,
   arm,
@@ -56,7 +57,24 @@ const makeT = (init = {}) => {
       S[s] ??= { opts: {}, active: "@live", windows: {} };
       S[s].windows["@curtain"] = name;
     },
-    killWindow: () => {},
+    killWindow: (target) => {
+      // target "sess:_curtain" or id — remove matching window
+      if (target.includes(":")) {
+        const [s, wname] = target.split(":");
+        if (!S[s]?.windows) return;
+        for (const [id, n] of Object.entries(S[s].windows)) {
+          if (n === wname) delete S[s].windows[id];
+        }
+      } else {
+        for (const s of Object.keys(S)) delete S[s].windows?.[target];
+      }
+    },
+    listWindowsInSession: (s) => {
+      const wins = S[s]?.windows || {};
+      return Object.entries(wins).map(([id, name]) => ({ id, name }));
+    },
+    setHook: () => {},
+    setDetachOnDestroy: () => {},
     windowNameOf: (winId) => {
       for (const s of Object.keys(S))
         if (S[s].windows?.[winId] !== undefined) return S[s].windows[winId];
@@ -194,6 +212,48 @@ test("disarm reveals the live window before killing the card", () => {
   disarm("s1", t);
   assert.equal(t._S.s1.active, "@live");
   assert.equal(t.getSessOpt("s1", "@herald_armed"), "0");
+});
+
+test("afterWindowKill: only _curtain left → kill card (session dies with it)", () => {
+  const t = makeT(freshSession());
+  arm("s1", t);
+  // Operator killed live window (prefix+&); only card remains.
+  delete t._S.s1.windows["@live"];
+  assert.equal(t.listWindowsInSession("s1").length, 1);
+  assert.equal(t.listWindowsInSession("s1")[0].name, "_curtain");
+  afterWindowKill("s1", t);
+  assert.equal(
+    t.listWindowsInSession("s1").length,
+    0,
+    "curtain window must die so the grey card does not stick",
+  );
+});
+
+test("afterWindowKill: live win retarget when one of several live windows dies", () => {
+  const t = makeT({
+    s1: {
+      opts: {},
+      active: "@live",
+      windows: { "@live": "main", "@live2": "other" },
+    },
+  });
+  arm("s1", t);
+  t.setSessOpt("s1", "@herald_live_win", "@live");
+  delete t._S.s1.windows["@live"];
+  afterWindowKill("s1", t);
+  assert.equal(t.getSessOpt("s1", "@herald_live_win"), "@live2");
+  assert.ok(t._S.s1.windows["@curtain"], "card stays when live work remains");
+});
+
+test("afterWindowKill: card killed → disarm cleanly, live work remains", () => {
+  const t = makeT(freshSession());
+  arm("s1", t);
+  t.setSessOpt("s1", "@herald_covered", "1");
+  delete t._S.s1.windows["@curtain"];
+  afterWindowKill("s1", t);
+  assert.equal(t.getSessOpt("s1", "@herald_armed"), "0");
+  assert.equal(t.getSessOpt("s1", "@herald_covered"), "0");
+  assert.ok(t._S.s1.windows["@live"]);
 });
 
 test("arm pins the terminal title to the live window, not the card", () => {
