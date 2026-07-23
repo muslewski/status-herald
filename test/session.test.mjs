@@ -2635,6 +2635,44 @@ test("stampFromHook fires sound spawn on edge into needs", () => {
   assert.equal(calls.length, 0);
 });
 
+test("stampFromHook fires sound on working→done when events includes done", () => {
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  t.setSessOpt("s1", "@herald_state", "working");
+  t.setSessOpt("s1", "@herald_covered", "1");
+  const calls = [];
+  const soundCfg = {
+    enabled: true,
+    mode: "day",
+    events: ["needs", "done"],
+    onlyWhenCovered: false,
+    dedupeSec: 8,
+    backends: [{ type: "command", day: "echo your-turn" }],
+  };
+  stampFromHook(
+    "%9",
+    {
+      event: "Stop",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+    },
+    7000,
+    t,
+    { lease: {}, settle: {}, sound: soundCfg },
+    {
+      spawn: (cmd, args) => {
+        calls.push(args);
+        return { unref() {} };
+      },
+    },
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "done");
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][1], "echo your-turn");
+  assert.equal(t.getSessOpt("s1", "@herald_sound_last"), "7000");
+});
+
 test("stampFromHook does not fire sound when sound disabled (default)", () => {
   const t = makeT(freshSession());
   t.sessionOf = () => "s1";

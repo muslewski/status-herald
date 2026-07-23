@@ -67,7 +67,7 @@ test("shouldFireSound: disabled / mode off / empty backends", () => {
   );
 });
 
-test("shouldFireSound: only NEEDS edge", () => {
+test("shouldFireSound: only NEEDS edge by default", () => {
   assert.equal(
     shouldFireSound(baseCfg(), {
       prevState: STATES.WORKING,
@@ -88,11 +88,52 @@ test("shouldFireSound: only NEEDS edge", () => {
       nextState: STATES.DONE,
     }),
     false,
+    "done not in default events",
   );
   assert.equal(
     shouldFireSound(baseCfg(), {
       prevState: STATES.IDLE,
       nextState: STATES.WORKING,
+    }),
+    false,
+  );
+});
+
+test("shouldFireSound: done edge when events includes done (Grok your-turn)", () => {
+  const cfg = baseCfg({ events: ["needs", "done"] });
+  assert.equal(
+    shouldFireSound(cfg, {
+      prevState: STATES.WORKING,
+      nextState: STATES.DONE,
+    }),
+    true,
+  );
+  assert.equal(
+    shouldFireSound(cfg, {
+      prevState: STATES.COMPACTING,
+      nextState: STATES.DONE,
+    }),
+    true,
+  );
+  assert.equal(
+    shouldFireSound(cfg, {
+      prevState: STATES.IDLE,
+      nextState: STATES.DONE,
+    }),
+    false,
+    "idle→done is not a your-turn wake",
+  );
+  assert.equal(
+    shouldFireSound(cfg, {
+      prevState: STATES.DONE,
+      nextState: STATES.DONE,
+    }),
+    false,
+  );
+  assert.equal(
+    shouldFireSound(baseCfg({ events: ["done"] }), {
+      prevState: STATES.WORKING,
+      nextState: STATES.NEEDS,
     }),
     false,
   );

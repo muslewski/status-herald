@@ -72,7 +72,12 @@ herald curtain inspect
 
 ## Attention sound (optional)
 
-By default Herald is **silent**. When an agent enters **NEEDS YOU** (approval / permission), you can play a short cue on this machine, a remote host (e.g. SSH to a laptop), and/or ntfy.
+By default Herald is **silent**. When you opt in, it can play a short cue on this machine, a remote host (e.g. SSH to a laptop), and/or ntfy on attention edges:
+
+- **`needs`** — approval / permission (⚠ NEEDS YOU). Rare if the CLI is in always-approve / yolo mode.
+- **`done`** — turn finished after work (your turn to type). Useful for Grok with `permission_mode = "always-approve"`, where approval hooks almost never fire.
+
+Default product events list is `["needs"]` only; add `"done"` when you want your-turn wakes.
 
 ```bash
 # 1. Add backends under curtain.sound in ~/.config/status-herald/config.json
@@ -91,6 +96,7 @@ Example backend (SSH to a Mac that can `afplay`):
     "sound": {
       "enabled": true,
       "mode": "day",
+      "events": ["needs", "done"],
       "onlyWhenCovered": true,
       "backends": [
         {
