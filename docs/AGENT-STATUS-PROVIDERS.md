@@ -1,3 +1,10 @@
+---
+title: "Agent status providers"
+description: "Tool-neutral filesystem convention for optional peer heartbeats and session records."
+section: reference
+order: 30
+---
+
 # Agent Status Providers convention
 
 **Schema 1 — 2026-07-16**
@@ -9,7 +16,8 @@ product branding (not “herald plugins”).
 
 Purpose: let optional siblings (token-oracle, agentic-sage, llm-armory, status-herald)
 discover each other when co-installed, without hard dependencies. Absent providers
-mean empty features, never errors.
+mean empty features, never errors. Token-oracle’s separate `forecast.json` feed is what
+powers herald **bar gauges** — see [Works with](./works-with.md).
 
 ---
 

@@ -1,0 +1,17 @@
+{
+  "title": "status-herald",
+  "description": "tmux curtain cards and terminal status surfaces for agent CLIs",
+  "sidebar": [
+    { "title": "Home", "href": "index.md" },
+    { "title": "Getting started", "href": "getting-started.md" },
+    { "title": "Bestiary", "href": "BESTIARY.md" },
+    { "title": "Works with", "href": "works-with.md" },
+    {
+      "title": "Reference",
+      "items": [
+        { "title": "Agent status providers", "href": "AGENT-STATUS-PROVIDERS.md" },
+        { "title": "Interop ↔ agentic-sage", "href": "interop-status-herald.md" }
+      ]
+    }
+  ]
+}

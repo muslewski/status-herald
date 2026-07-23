@@ -22,7 +22,9 @@
   "scripts": {
     "test": "node --test",
     "lint": "biome check .",
-    "format": "biome format --write ."
+    "format": "biome format --write .",
+    "docs:check": "node ../docs-kit/bin/docs-kit.mjs check docs/",
+    "docs:health": "node ../docs-kit/bin/docs-kit.mjs health docs/"
   },
   "keywords": [
     "tmux",

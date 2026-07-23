@@ -1,9 +1,18 @@
+---
+title: "Bestiary"
+description: "HERALD denizens — per-session ASCII creatures (fox, cat, owl), poses by state, and config."
+section: concepts
+order: 20
+---
+
 # HERALD Bestiary
 
 When the curtain drops, you don’t just get a timer — you get a **denizen**.  
 A little creature that shares the stage with your session: same card, same state, same panic when something needs you.
 
 They are pure ASCII. They animate. They are assigned **per tmux session** so a fleet grid looks like a living cast, not a wall of identical icons.
+
+> **Signature surface.** This page is the public face of curtain denizens. Install and arm: [Getting started](./getting-started.md). Fleet siblings (optional gauges, COMPACTING contract): [Works with](./works-with.md).
 
 ---
 
@@ -30,6 +39,8 @@ Quick, nosy, always in the wings. Good for sessions that dig and dash — resear
 | NEEDS YOU | Alarm ears, triple bang |
 | COMPACTING | zzz in the fur |
 | idle | Dozing until the next cue |
+
+COMPACTING is a **distinct card face** (never DONE): hooks map `PreCompact` → compacting so the denizen naps while the agent rewrites context. That vocabulary lines up with [agentic-sage](https://github.com/muslewski/agentic-sage) on the observational compact path — see [interop](./interop-status-herald.md). Herald still answers **per-pane UI**; sage answers fleet hotness.
 
 ---
 
@@ -92,17 +103,16 @@ Force a species (optional):
 }
 ```
 
-### Card chrome (click / keys)
+### Chrome (click / keys)
 
-Bottom-right of every card (dim, low distraction):
+Instant tab-open selects the live pane, so **card bottom buttons are not the primary hit target**. Use the **status bar** instead (always available while armed):
 
-| Control | Click | Key | What it does |
-|---------|--------|-----|----------------|
-| **× off** | left-click | `x` or `o` | Pause curtain for this session (live pane stays visible; no auto-cover until `herald curtain resume`) |
-| **↻ pet** | left-click | `a` or `p` | Cycle animal fox → cat → owl |
+| Control | Where | What it does |
+|---------|--------|----------------|
+| **× off** | status-right click, or card dock, or key `x`/`o` on card | Pause curtain (live stays up; no auto-cover until `resume`) |
+| **↻ pet** | status-right click, or card dock, or key `a`/`p` on card | Cycle animal fox → cat → owl |
 
-Needs a mouse-capable terminal + tmux mouse (or just use the keys).  
-More buttons can land in the same strip later.
+CLI: `herald curtain pause` / `herald curtain pet`. Needs `mouse on` for status clicks.
 
 
 ---
@@ -113,6 +123,8 @@ More buttons can land in the same strip later.
 - Subtle motes stay in the background.  
 - Card still shows **tmux session name**, timer, and subagent count under the pose.  
 - Full art is centered on one vertical axis (ears → eyes → feet). Compact panes get a 3-line form.
+
+Denizens live on the **card**. Account **gauges** on the tmux bottom bar (and Claude statusline) are separate: they read **[token-oracle](https://github.com/muslewski/token-oracle)**’s `forecast.json` when present — blank without it, never an error. See [Works with](./works-with.md) and [Getting started](./getting-started.md#bars-and-gauges-optional-siblings).
 
 ---
 

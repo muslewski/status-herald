@@ -1,3 +1,10 @@
+---
+title: "Interop ↔ agentic-sage"
+description: "Pointer to the observational compact contract between status-herald and agentic-sage."
+section: reference
+order: 40
+---
+
 # Interop: status-herald ↔ agentic-sage
 
 **This file is a pointer.** The canonical observational contract lives in the sibling
