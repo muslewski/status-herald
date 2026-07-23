@@ -225,3 +225,8 @@ This repository has an Atlas: a plain-markdown knowledge base of what the code i
 - **Public docs:** `docs/` uses docs-kit frontmatter; `npm run docs:health`. Soft-nudge on finish (with recollection) — not a hard gate.
 - Detailed procedures (navigation, recollection on finish, note authoring, toolkit update) are plain markdown files under `.claude/skills/<name>/SKILL.md` — read the matching one before doing those tasks.
 <!-- /atlas:onramp -->
+
+## Docs vs mind
+
+- **Public product docs** → [`docs/`](./docs/) (what marketing sites SSG at `/docs/`)
+- **Specs / plans / internal notes** → [`status-herald-mind/`](./status-herald-mind/) (memory-atlas vault — **not** `docs/superpowers/`)
