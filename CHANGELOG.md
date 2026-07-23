@@ -8,6 +8,15 @@ are not soft-aliased (see design D3).
 
 ## [Unreleased]
 
+### Added
+
+- **Curtain attention sound** (default **off**) — on the edge into `needs`
+  (approval / permission), Herald can fire pluggable backends (`command`,
+  `local`, `ssh`, `ntfy`). Config under `curtain.sound`; CLI:
+  `herald curtain sound [status|day|night|off|enable|disable|test]`.
+  Doctor reports a soft `curtain-sound` line. No Mac/host assumptions in
+  defaults. Spec: `status-herald-mind/specs/2026-07-23-curtain-sound-design.md`.
+
 
 ## [0.2.3] — 2026-07-23
 

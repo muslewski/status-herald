@@ -1,10 +1,10 @@
 ---
 type: zone
-summary: "Config load/merge for status-herald — DEFAULTS (curtain, lease, settle, animation, bars), deep-merge from XDG/HERALD_CONFIG JSON, titleStripPrefixes, themeBySession; missing/bad file never throws."
+summary: "Config load/merge for status-herald — DEFAULTS (curtain, lease, settle, animation, bars, sound), deep-merge from XDG/HERALD_CONFIG JSON, getConfigPath, titleStripPrefixes, themeBySession; missing/bad file never throws."
 tags: [config, defaults]
 status: seeded
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-07-23
 verifiedAt: unverified
 owns:
   routes: []
@@ -21,7 +21,7 @@ sources: []
 
 ## What this is
 
-**Config substrate** for the whole package. `lib/config.mjs` defines `DEFAULTS` (curtain coverable states, focus adapter settings, autoArm, themes, animation/theatrics knobs, lease/settle TTLs, bar segments) and `loadConfig()` that deep-merges user JSON from `$HERALD_CONFIG` or `~/.config/status-herald/config.json`. Hook-safe: absent or corrupt config returns defaults without throwing.
+**Config substrate** for the whole package. `lib/config.mjs` defines `DEFAULTS` (curtain coverable states, focus adapter settings, autoArm, themes, animation/theatrics knobs, lease/settle TTLs, **sound** (default silent), bar segments) and `loadConfig()` that deep-merges user JSON from `$HERALD_CONFIG` or `~/.config/status-herald/config.json`. Hook-safe: absent or corrupt config returns defaults without throwing. `getConfigPath()` is shared with sound CLI patching.
 
 Also exports helpers used at the focus boundary (`stripTitle` / `globToRe` / `merge`) so adapters and session code share one title-normalization story.
 

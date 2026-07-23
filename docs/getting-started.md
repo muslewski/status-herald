@@ -70,6 +70,43 @@ herald curtain status
 herald curtain inspect
 ```
 
+## Attention sound (optional)
+
+By default Herald is **silent**. When an agent enters **NEEDS YOU** (approval / permission), you can play a short cue on this machine, a remote host (e.g. SSH to a laptop), and/or ntfy.
+
+```bash
+# 1. Add backends under curtain.sound in ~/.config/status-herald/config.json
+# 2. Enable and pick intensity:
+herald curtain sound enable
+herald curtain sound day      # or night | off
+herald curtain sound test     # fire backends now (no NEEDS required)
+herald curtain sound          # status
+```
+
+Example backend (SSH to a Mac that can `afplay`):
+
+```json
+{
+  "curtain": {
+    "sound": {
+      "enabled": true,
+      "mode": "day",
+      "onlyWhenCovered": true,
+      "backends": [
+        {
+          "type": "ssh",
+          "host": "mac-music",
+          "day": "afplay /System/Library/Sounds/Glass.aiff",
+          "night": "afplay /System/Library/Sounds/Sosumi.aiff"
+        }
+      ]
+    }
+  }
+}
+```
+
+`onlyWhenCovered: true` keeps the focused live pane quiet. Disable anytime with `herald curtain sound disable` or `mode: "off"`. If you previously used a personal `ping-mac-music.sh` Notification hook, turn that off after Herald sound works to avoid double chimes.
+
 ## Bars and gauges (optional siblings)
 
 Herald’s **tmux status-right** account segments (`account5h` / `accountWeekly`) and Claude statusline gauges read rate-limit / usage data from **[token-oracle](https://github.com/muslewski/token-oracle)** via `~/.local/share/token-oracle/forecast.json` (`HERALD_TOKEN_FEED` can override the ingest path). Without oracle installed and publishing that file, those gauges stay blank — curtain cards still work.

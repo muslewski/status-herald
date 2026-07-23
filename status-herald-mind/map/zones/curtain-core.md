@@ -1,10 +1,10 @@
 ---
 type: zone
-summary: "Curtain truth engine — STATES, truth leases (subagent/watcher/bg_shell/turn), settle policy, hook stamp path, session arm/cover/reveal/focus, tmux opts, grid up/down, wash/bar coupling, debug capture."
+summary: "Curtain truth engine — STATES, truth leases (subagent/watcher/bg_shell/turn), settle policy, hook stamp path, NEEDS-edge attention sound (pluggable backends), session arm/cover/reveal/focus, tmux opts, grid up/down, wash/bar coupling, debug capture."
 tags: [curtain, leases, tmux, session]
 status: seeded
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-07-23
 verifiedAt: unverified
 owns:
   routes: []
@@ -18,6 +18,7 @@ owns:
     - "lib/curtain/orchestrator.mjs"
     - "lib/curtain/tmux.mjs"
     - "lib/curtain/wash.mjs"
+    - "lib/curtain/sound.mjs"
     - "lib/curtain/grid.mjs"
     - "lib/curtain/debug.mjs"
   tools: []
@@ -44,6 +45,7 @@ Core **curtain lifecycle**: opaque status cards cover unfocused agent panes; foc
 | `orchestrator.mjs` | Pane swap cover/reveal + onEvent/onFocusIn/Out |
 | `tmux.mjs` | Session opts (`@herald_state`, `@herald_leases`, peers) |
 | `wash.mjs` | Status-bar state colour wash while covered |
+| `sound.mjs` | Default-off NEEDS-edge attention audio; pluggable backends |
 | `grid.mjs` | Multi-slot `herald curtain up/down` session layout |
 | `debug.mjs` | Capture / debug log paths |
 

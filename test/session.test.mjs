@@ -2573,3 +2573,92 @@ test("arm is idempotent for entity too", () => {
   arm("s1", t);
   assert.equal(t.getSessOpt("s1", "@herald_entity"), "sentinel");
 });
+
+test("stampFromHook fires sound spawn on edge into needs", () => {
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  t.setSessOpt("s1", "@herald_state", "working");
+  const calls = [];
+  const soundCfg = {
+    enabled: true,
+    mode: "day",
+    events: ["needs"],
+    onlyWhenCovered: false,
+    dedupeSec: 8,
+    backends: [{ type: "command", day: "echo needs-you" }],
+  };
+  stampFromHook(
+    "%9",
+    {
+      event: "Notification",
+      notificationType: "permission_prompt",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+    },
+    5000,
+    t,
+    { lease: {}, settle: {}, sound: soundCfg },
+    {
+      spawn: (cmd, args) => {
+        calls.push({ cmd, args });
+        return { unref() {} };
+      },
+    },
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "needs");
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].args[1], "echo needs-you");
+  assert.equal(t.getSessOpt("s1", "@herald_sound_last"), "5000");
+
+  // Still needs — no re-fire
+  calls.length = 0;
+  stampFromHook(
+    "%9",
+    {
+      event: "Notification",
+      notificationType: "permission_prompt",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+    },
+    5001,
+    t,
+    { lease: {}, settle: {}, sound: soundCfg },
+    {
+      spawn: (cmd, args) => {
+        calls.push({ cmd, args });
+        return { unref() {} };
+      },
+    },
+  );
+  assert.equal(calls.length, 0);
+});
+
+test("stampFromHook does not fire sound when sound disabled (default)", () => {
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  t.setSessOpt("s1", "@herald_state", "working");
+  const calls = [];
+  stampFromHook(
+    "%9",
+    {
+      event: "Notification",
+      notificationType: "permission_prompt",
+      hasTasks: false,
+      subagents: 0,
+      shells: 0,
+    },
+    6000,
+    t,
+    { lease: {}, settle: {}, sound: { enabled: false, backends: [] } },
+    {
+      spawn: () => {
+        calls.push(1);
+        return { unref() {} };
+      },
+    },
+  );
+  assert.equal(t.getSessOpt("s1", "@herald_state"), "needs");
+  assert.equal(calls.length, 0);
+});

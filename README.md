@@ -296,6 +296,10 @@ The `curtain` block, with its defaults:
   (`osascript`'s `name of fp`) before reading its window title.
 - `focus.titleStripPrefixes` — ordered list of prefixes the box strips (first
   match wins) before comparing an incoming title to session window labels.
+- `sound` — **default off**. On the edge into `needs` (approval / permission),
+  fire pluggable backends (`command` / `local` / `ssh` / `ntfy`). Modes:
+  `day` | `night` | `off`. CLI: `herald curtain sound …`. See
+  [getting started — attention sound](./docs/getting-started.md#attention-sound-optional).
 - `autoArm.enabled` / `autoArm.sessionGlob` — whether `herald curtain arm-all`
   is allowed to run, and which tmux sessions it arms (`*` = all,
   `prefix*` = glob-matched, or an exact name).

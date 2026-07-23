@@ -33,6 +33,46 @@ const makeT = (init = {}) => {
 /** Stub wiring: inject via settingsPaths pointing at temp files is heavy;
  *  we exercise check shape with real disk for card-loop and soft hooks. */
 
+test("runDoctor: curtain-sound soft check reports default silent", () => {
+  const { checks } = runDoctor({
+    tmuxOk: true,
+    inTmux: true,
+    env: {},
+    t: makeT(),
+    nowSec: 1000,
+    bars: { tmux: {}, claude: {} },
+    sound: { enabled: false, mode: "day", backends: [] },
+    settingsPaths: {
+      claude: "/tmp/herald-doctor-no-claude-settings",
+      grok: "/tmp/herald-doctor-no-grok-hooks",
+    },
+  });
+  const sound = checks.find((c) => c.name === "curtain-sound");
+  assert.ok(sound);
+  assert.equal(sound.ok, true);
+  assert.equal(sound.hard, false);
+  assert.match(sound.detail, /off|silent/i);
+});
+
+test("runDoctor: curtain-sound soft-fails when enabled with no backends", () => {
+  const { checks } = runDoctor({
+    tmuxOk: true,
+    inTmux: true,
+    env: {},
+    t: makeT(),
+    nowSec: 1000,
+    bars: { tmux: {}, claude: {} },
+    sound: { enabled: true, mode: "day", backends: [] },
+    settingsPaths: {
+      claude: "/tmp/herald-doctor-no-claude-settings",
+      grok: "/tmp/herald-doctor-no-grok-hooks",
+    },
+  });
+  const sound = checks.find((c) => c.name === "curtain-sound");
+  assert.equal(sound.ok, false);
+  assert.equal(sound.hard, false);
+});
+
 test("runDoctor: card-loop-bin hard check green on this checkout", () => {
   const { checks, ok } = runDoctor({
     tmuxOk: true,

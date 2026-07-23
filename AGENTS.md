@@ -157,6 +157,10 @@ See README "Config reference". Curtain works the same regardless of agent.
 | `curtain.settle.maxNeedsSec` | 0 | Abandoned NEEDS (0=off) |
 | `curtain.lines.model` | false | Optional model@effort info line |
 | `curtain.lines.sageZone` | false | Optional sage zone info line |
+| `curtain.sound.enabled` | false | Attention sound on NEEDS edge (default silent) |
+| `curtain.sound.mode` | day | `day` \| `night` \| `off` intensity |
+| `curtain.sound.backends` | [] | `command` / `local` / `ssh` / `ntfy` backends |
+| `curtain.sound.onlyWhenCovered` | false | Skip sound when live pane is focused |
 | `bars.segments.sage.enabled` | false | Sage zone bar segment |
 
 ### Truth-lease tmux options

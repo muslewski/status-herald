@@ -74,6 +74,17 @@ test("curtain defaults carry the theme knobs", () => {
   assert.equal(c.background, undefined);
 });
 
+test("curtain.sound defaults are silent with no backends", () => {
+  const s = loadConfig(join(tmpdir(), "nope-herald-sound-xyz.json")).curtain
+    .sound;
+  assert.equal(s.enabled, false);
+  assert.equal(s.mode, "day");
+  assert.deepEqual(s.events, ["needs"]);
+  assert.equal(s.onlyWhenCovered, false);
+  assert.equal(s.dedupeSec, 8);
+  assert.deepEqual(s.backends, []);
+});
+
 test("animation defaults include enabled, reducedMotion, and draw timing", () => {
   const a = loadConfig(join(tmpdir(), "nope-herald-anim-xyz.json")).curtain
     .animation;
