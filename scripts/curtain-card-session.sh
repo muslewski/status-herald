@@ -63,13 +63,11 @@ trap 'exit 129' HUP
 tick=0
 draw_tick=0
 prev_draw=
-# Wheel→pet is ONE pet per gesture, not rate-limited spam:
-# trackpad inertia / Ghostty can emit dozens of SGR wheel events per flick.
-# First event after WHEEL_IDLE_MS of silence → pet once; rest of the burst is
-# consumed only. Never CSI-3J on wheel (that re-fired wheel → stuck loop).
-WHEEL_IDLE_MS=550
-last_wheel_event_ms=0
-wheel_gesture_petted=0
+# Smooth wheel→pet: step at most every WHEEL_STEP_MS while scroll events flow.
+# Continuous scroll walks the roster; a single flick usually yields 1–2 steps.
+# No CSI-3J on wheel (that re-fired events → stuck loop).
+WHEEL_STEP_MS=200
+last_wheel_pet_ms=0
 
 # Apply a chrome action (pause | pet | pet-prev). Returns 0 if handled.
 chrome_action() {
@@ -195,6 +193,9 @@ while :; do
   draw_frames=${O[@herald_draw_frames]:-8}
   entity=${O[@herald_entity]:-}
   seed=${O[@herald_seed]:-0}
+  morph_from=${O[@herald_morph_from]:-}
+  morph_i=${O[@herald_morph_i]:-0}
+  morph_n=${O[@herald_morph_n]:-6}
   # settleAfter is relative to state entry: a monotonic tick from arm freezes
   # DONE/COMPACTING animation after a long WORKING session. Reset on change so
   # the first paint of the new state uses tick 0.
@@ -220,6 +221,19 @@ while :; do
   if [ "$draw" = "shut" ] || [ "$draw" = "open" ]; then
     draw_flags=(--draw "$draw" --draw-tick "$draw_tick")
   fi
+  # Pet transform: cross-dissolve morph_from → entity over morph_n paints.
+  morph_flags=()
+  if [ -n "$morph_from" ] && [ -n "$entity" ] && [ "$morph_from" != "$entity" ]; then
+    # progress 0..1 across frames 0..n-1
+    morph_p=$(awk -v i="${morph_i:-0}" -v n="${morph_n:-6}" 'BEGIN{
+      if (n < 2) { print 1; exit }
+      p = i / (n - 1)
+      if (p < 0) p = 0
+      if (p > 1) p = 1
+      printf "%.4f", p
+    }')
+    morph_flags=(--morph-from "$morph_from" --morph-progress "$morph_p")
+  fi
   # Session name for the card label (prefix+$ renames show up next tick).
   sess_name=$(tmux display -p '#{session_name}' 2>/dev/null || true)
   herald render --surface curtain-card \
@@ -230,7 +244,18 @@ while :; do
     --entity "${entity:-}" --seed "${seed:-0}" \
     --session "${sess_name:-}" \
     --cols "$cols" --rows "$rows" --color always \
-    "${draw_flags[@]}" 2>/dev/null || true
+    "${draw_flags[@]}" "${morph_flags[@]}" 2>/dev/null || true
+  # Advance morph after paint; clear when done.
+  if [ -n "$morph_from" ] && [ -n "$entity" ] && [ "$morph_from" != "$entity" ]; then
+    next_mi=$((morph_i + 1))
+    if [ "$next_mi" -ge "${morph_n:-6}" ]; then
+      tmux set-option -u @herald_morph_from 2>/dev/null || true
+      tmux set-option -u @herald_morph_i 2>/dev/null || true
+      tmux set-option -u @herald_morph_n 2>/dev/null || true
+    else
+      tmux set-option @herald_morph_i "$next_mi" 2>/dev/null || true
+    fi
+  fi
   tick=$((tick + 1))
   # Advance / complete stage-curtain phase on the existing tick loop.
   if [ "$draw" = "shut" ] || [ "$draw" = "open" ]; then
@@ -247,10 +272,12 @@ while :; do
       prev_draw=
     fi
   fi
-  # Pace: draw burst uses draw_ms (full shut/open ≤ ~600ms); else theme hot rate
-  # ONLY while covered/visible; otherwise 1 s.
+  # Pace: draw burst uses draw_ms (full shut/open ≤ ~600ms); morph ~12fps;
+  # else theme hot rate ONLY while covered/visible; otherwise 1 s.
   if [ "$draw" = "shut" ] || [ "$draw" = "open" ]; then
     ms=${draw_ms:-75}
+  elif [ -n "$morph_from" ] && [ "$morph_from" != "$entity" ]; then
+    ms=90
   elif [ "$covered" = "1" ]; then
     ms=${frame_ms:-1000}
   else
@@ -267,28 +294,29 @@ while :; do
     if [ "$IN_KIND" = "wheel" ]; then
       # Easter egg: scroll does not move the scene — it cycles the pet.
       # up → previous, down → next. Never reveal on wheel.
-      # Gesture coalesce: silence ≥ WHEEL_IDLE_MS starts a new gesture; only the
-      # first event of a gesture pets. Mid-burst events are eaten so inertia
-      # cannot walk the whole roster. No CSI 3J here (feedback loop).
+      # Smooth rate limit: at most one step per WHEEL_STEP_MS while events flow
+      # (continuous scroll walks roster; no stuck loop; no CSI 3J).
       now_ms=$(date +%s%3N 2>/dev/null || echo $(($(date +%s) * 1000)))
-      gap=$((now_ms - last_wheel_event_ms))
-      if [ "$last_wheel_event_ms" -eq 0 ] || [ "$gap" -ge "$WHEEL_IDLE_MS" ]; then
-        wheel_gesture_petted=0
-      fi
-      last_wheel_event_ms=$now_ms
-      if [ "$wheel_gesture_petted" -eq 0 ]; then
-        wheel_gesture_petted=1
-        if [ "$IN_WHEEL" = "up" ]; then
+      if [ "$last_wheel_pet_ms" -eq 0 ] || [ $((now_ms - last_wheel_pet_ms)) -ge "$WHEEL_STEP_MS" ]; then
+        last_wheel_pet_ms=$now_ms
+        if [ "${IN_WHEEL:-down}" = "up" ]; then
           chrome_action pet-prev "$sess" || true
         else
           chrome_action pet "$sess" || true
         fi
       fi
-      # Drain remaining wheel events in this burst so the next read_event is not
-      # immediately another wheel (and so we don't re-enter pet for ~500ms).
-      while read_event 0.02; do
+      # Drain burst; allow another step only after WHEEL_STEP_MS (hold-scroll).
+      while read_event 0.015; do
         [ "$IN_KIND" = "wheel" ] || break
-        last_wheel_event_ms=$(date +%s%3N 2>/dev/null || echo $(($(date +%s) * 1000)))
+        now_ms=$(date +%s%3N 2>/dev/null || echo $(($(date +%s) * 1000)))
+        if [ $((now_ms - last_wheel_pet_ms)) -ge "$WHEEL_STEP_MS" ]; then
+          last_wheel_pet_ms=$now_ms
+          if [ "${IN_WHEEL:-down}" = "up" ]; then
+            chrome_action pet-prev "$sess" || true
+          else
+            chrome_action pet "$sess" || true
+          fi
+        fi
       done
     else
       if [ "$IN_KIND" = "click" ]; then

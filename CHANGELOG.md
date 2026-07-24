@@ -24,6 +24,10 @@ are not soft-aliased (see design D3).
 
 ### Fixed
 
+- **Smooth wheel pet + morph:** scroll steps the roster every ~200ms while
+  events flow (hold-scroll walks fox→cat→owl). Pet change cross-dissolves
+  (`@herald_morph_*`, ~6 frames) instead of hard-swapping the creature.
+
 - **Wheel→pet stuck loop:** after the first scroll, `CSI 3J` on each pet
   re-triggered wheel events (pet every ~450ms forever). Wheel path no longer
   wipes scrollback; one **gesture** = one pet (burst coalesce + idle gap).

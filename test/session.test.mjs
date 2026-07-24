@@ -482,6 +482,17 @@ test("cycleDenizen steps backward with dir -1", () => {
   assert.equal(cycleDenizen("s1", t, {}, 1), "cat");
 });
 
+test("cycleDenizen stamps morph_from for transform animation", () => {
+  const t = makeT(freshSession());
+  arm("s1", t);
+  t.setSessOpt("s1", "@herald_entity", "fox");
+  cycleDenizen("s1", t, {}, 1);
+  assert.equal(t.getSessOpt("s1", "@herald_entity"), "cat");
+  assert.equal(t.getSessOpt("s1", "@herald_morph_from"), "fox");
+  assert.equal(t.getSessOpt("s1", "@herald_morph_i"), "0");
+  assert.equal(t.getSessOpt("s1", "@herald_morph_n"), "6");
+});
+
 test("stampSession sets session state and since on working", () => {
   const t = makeT(freshSession());
   t.sessionOf = () => "s1";

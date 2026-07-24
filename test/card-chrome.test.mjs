@@ -6,7 +6,12 @@ import {
   layoutChrome,
   paintChromePlain,
 } from "../lib/curtain/card-chrome.mjs";
-import { nextSpecies, prevSpecies } from "../lib/curtain/denizens.mjs";
+import {
+  denizenCel,
+  morphCelDissolve,
+  nextSpecies,
+  prevSpecies,
+} from "../lib/curtain/denizens.mjs";
 
 test("layoutChrome places buttons on bottom row, right-aligned", () => {
   const L = layoutChrome(80, 24);
@@ -63,4 +68,30 @@ test("prevSpecies cycles fox←cat←owl←fox", () => {
   assert.ok(["fox", "cat", "owl"].includes(prevSpecies("")));
   // next then prev returns home
   assert.equal(prevSpecies(nextSpecies("fox")), "fox");
+});
+
+test("morphCelDissolve: endpoints and mid differ", () => {
+  const a = denizenCel({
+    species: "fox",
+    state: "done",
+    tier: "full",
+    tick: 0,
+    seed: 1,
+  });
+  const b = denizenCel({
+    species: "owl",
+    state: "done",
+    tier: "full",
+    tick: 0,
+    seed: 1,
+  });
+  assert.ok(a.length && b.length);
+  const at0 = morphCelDissolve(a, b, 0, 1);
+  const at1 = morphCelDissolve(a, b, 1, 1);
+  const mid = morphCelDissolve(a, b, 0.5, 1);
+  assert.ok(at0.length && at1.length && mid.length);
+  // Endpoints differ from each other and from mid (dissolve actually runs).
+  assert.notEqual(at0.join("\n"), at1.join("\n"));
+  assert.notEqual(mid.join("\n"), at0.join("\n"));
+  assert.notEqual(mid.join("\n"), at1.join("\n"));
 });

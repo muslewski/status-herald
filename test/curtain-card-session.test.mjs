@@ -112,7 +112,8 @@ test("card loop disables scrollback (alt screen + history-limit 0)", () => {
   assert.match(script, /clear-history/, "clears any inherited history at start");
   // CSI 3J only at card start — never on wheel/paint (wheel+3J feedback loop).
   assert.match(script, /1049h.*3J|3J.*1049|\\033\[3J/, "scrollback wipe at start");
-  assert.match(script, /WHEEL_IDLE_MS|wheel_gesture_petted/, "gesture-coalesce wheel→pet");
+  assert.match(script, /WHEEL_STEP_MS/, "rate-limited smooth wheel steps");
+  assert.match(script, /morph-from|morph_from|@herald_morph/, "pet transform morph");
   // Must not wipe scrollback inside the wheel handler (re-fires wheel).
   const wh = script.indexOf('if [ "$IN_KIND" = "wheel" ]');
   assert.ok(wh >= 0);
@@ -143,11 +144,7 @@ test("card loop maps wheel to pet / pet-prev and never reveals on wheel", () => 
   // SGR wheel base codes: strict 64/65 after modifier mask (not bare b>=64)
   assert.match(script, /base=.*64|\"64\"/, "wheel-up base 64");
   assert.match(script, /\"65\"|base.*65/, "wheel-down base 65");
-  assert.match(
-    script,
-    /wheel_gesture_petted|WHEEL_IDLE_MS/,
-    "one pet per gesture, not rate debounce",
-  );
+  assert.match(script, /WHEEL_STEP_MS/, "smooth step interval while scrolling");
 });
 
 test("card loop reads @herald_draw and passes --draw/--draw-tick to render", () => {
