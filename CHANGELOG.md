@@ -10,6 +10,13 @@ are not soft-aliased (see design D3).
 
 ### Added
 
+- **Status-bar curtain chrome (clickable pause/resume):**
+  - `MouseDown1Status` → toggle pause ↔ resume (`herald curtain status-click`)
+  - `MouseDown1StatusRight` → menu: × off / ▶ on / ↻ pet (`status-menu`)
+  - While paused, status-right shows static **`▶ curtain`** glyph (re-enable
+    affordance; no `#()` / status-interval cost)
+  - Binds installed on `arm` / `arm-all` (absolute node+bin path)
+  - Compat script `scripts/status-chrome-menu.sh` for old binds
 - **Curtain wheel easter egg**: scroll on the covered card no longer
   scrolls the scene — wheel **down** cycles the denizen next, wheel **up**
   previous (`pet` / `pet-prev`). SGR wheel events are consumed in the card loop.

@@ -69,7 +69,7 @@ Herald normalizes these.
 4. Use:
    - When Grok is working in an unfocused pane → card appears with timer + subagent count (approx for Grok).
    - `⚠ NEEDS YOU` on approval_required notifications.
-   - Tab focus / pane focus → live TUI **instantly**. Chrome × off / ↻ pet lives on **status-right** (works after open); also `herald curtain pause` / `pet`.
+   - Tab focus / pane focus → live TUI **instantly**. Chrome: **status bar click** toggles pause/resume (▶ curtain glyph while paused); status-right menu = off/on/pet; also `herald curtain pause` / `resume` / `pet`.
    - `herald curtain status` (from inside a pane) shows current `@herald_state`.
 
 5. Hold open (copy text from a live pane without the card re-covering):
