@@ -127,7 +127,7 @@ test("card loop maps wheel to pet / pet-prev and never reveals on wheel", () => 
   // Wheel branch must call pet without falling into reveal.
   const wheelStart = script.indexOf('if [ "$IN_KIND" = "wheel" ]');
   assert.ok(wheelStart >= 0, "wheel if-block present");
-  const wheelSlice = script.slice(wheelStart, wheelStart + 450);
+  const wheelSlice = script.slice(wheelStart, wheelStart + 900);
   assert.match(wheelSlice, /pet-prev/, "up → pet-prev");
   assert.match(wheelSlice, /chrome_action pet /, "down → pet");
   assert.doesNotMatch(
