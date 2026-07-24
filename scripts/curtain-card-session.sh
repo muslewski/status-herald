@@ -32,11 +32,13 @@ printf '\033[?25l'
 # Mouse tracking (SGR): corner chrome buttons (× off / ↻ pet) + wheel→pet.
 # Restored on exit so we never leave the host terminal sticky.
 printf '\033[?1000h\033[?1002h\033[?1006h' 2>/dev/null || true
-# Alternate screen + zero scrollback: the card repaints every tick. Without
-# this, those frames stack in pane history (history-limit 2000 default) and
-# with `mouse on` a scroll shows "matrix" rain of old paints / SGR debris.
-# Wheel must cycle pets, not dig through that junk.
-printf '\033[?1049h' 2>/dev/null || true
+# Kill "matrix" scroll junk hard:
+# 1) Alternate screen (1049) — paints stay off the primary buffer
+# 2) CSI 3J — erase terminal scrollback (Ghostty/xterm; mosh may still leak)
+# 3) tmux history-limit 0 + clear-history — pane history empty under mouse on
+# 4) Wrap stays OFF for the whole loop (paint uses absolute CUP, no \n scroll)
+# Wheel must cycle pets, not dig through stacked OSC frames.
+printf '\033[?1049h\033[2J\033[3J\033[H\033[?7l' 2>/dev/null || true
 tmux set-option -w history-limit 0 2>/dev/null || true
 tmux clear-history 2>/dev/null || true
 # On exit, reveal — which (when tmuxBar coupling is on) restores the status bar,
@@ -48,7 +50,7 @@ tmux clear-history 2>/dev/null || true
 # that returns continues the loop — after `tmux kill-window` the orphan keeps
 # painting a dead tty and fleets accumulate 100+ glitching card processes.
 cleanup() {
-  printf '\033[?1006l\033[?1002l\033[?1000l' 2>/dev/null || true
+  printf '\033[?7h\033[?1006l\033[?1002l\033[?1000l' 2>/dev/null || true
   printf '\033[?1049l' 2>/dev/null || true
   s=$(tmux display -p "#{session_name}" 2>/dev/null)
   r=$(tmux show -t "$s" -v @herald_refreshing 2>/dev/null || true)
@@ -214,6 +216,10 @@ while :; do
     --session "${sess_name:-}" \
     --cols "$cols" --rows "$rows" --color always \
     "${draw_flags[@]}" 2>/dev/null || true
+  # Wipe outer terminal scrollback (Ghostty) + tmux history every frame so a
+  # trackpad scroll cannot dig up stacked paint/"matrix" debris over mosh.
+  printf '\033[3J' 2>/dev/null || true
+  tmux clear-history 2>/dev/null || true
   tick=$((tick + 1))
   # Advance / complete stage-curtain phase on the existing tick loop.
   if [ "$draw" = "shut" ] || [ "$draw" = "open" ]; then

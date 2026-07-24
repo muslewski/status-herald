@@ -110,6 +110,9 @@ test("card loop disables scrollback (alt screen + history-limit 0)", () => {
     "window history-limit 0 — nothing to scroll into",
   );
   assert.match(script, /clear-history/, "clears any inherited history at start");
+  // CSI 3J wipes outer terminal scrollback (Ghostty) every paint — mosh/mouse
+  // otherwise lets the operator dig up stacked SGR "matrix" frames.
+  assert.match(script, /\\033\[3J|3J/, "erases terminal scrollback");
 });
 
 // Easter egg: wheel must cycle pets, never scroll or reveal.
