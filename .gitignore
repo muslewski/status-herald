@@ -1,3 +1,10 @@
 node_modules/
 package-lock.json
 .claude/worktrees/
+
+# secrets / local env (never commit)
+.env
+.env.*
+!.env.example
+!.env*.example
+
