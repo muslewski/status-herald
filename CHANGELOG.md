@@ -24,6 +24,11 @@ are not soft-aliased (see design D3).
 
 ### Fixed
 
+- **Denizen thrash on focused card:** per-frame `CSI 3J` + loose
+  `b>=64` wheel match caused continuous pet cycles (trackpad inertia /
+  synthetic wheel). Wheel now matches only base 64/65, debounced (~450ms),
+  and scrollback wipe runs at start / on intentional wheel — not every paint.
+
 - **Curtain glitching onto the active focused tab**: agent CLIs (Grok/Claude)
   rewrite the terminal OSC title with chat status. `focus()` used to treat any
   non-matching title as “cover everyone,” which yanked a card over the pane you

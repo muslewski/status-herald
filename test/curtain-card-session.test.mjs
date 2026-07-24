@@ -110,9 +110,9 @@ test("card loop disables scrollback (alt screen + history-limit 0)", () => {
     "window history-limit 0 — nothing to scroll into",
   );
   assert.match(script, /clear-history/, "clears any inherited history at start");
-  // CSI 3J wipes outer terminal scrollback (Ghostty) every paint — mosh/mouse
-  // otherwise lets the operator dig up stacked SGR "matrix" frames.
+  // CSI 3J at start / on wheel — NOT every paint (that feedback-looped pets).
   assert.match(script, /\\033\[3J|3J/, "erases terminal scrollback");
+  assert.match(script, /WHEEL_PET_MS/, "debounces wheel→pet");
 });
 
 // Easter egg: wheel must cycle pets, never scroll or reveal.
@@ -135,9 +135,10 @@ test("card loop maps wheel to pet / pet-prev and never reveals on wheel", () => 
     /curtain reveal/,
     "wheel must not reveal live pane",
   );
-  // SGR wheel base codes documented in script
-  assert.match(script, /\b64\b/, "mentions SGR wheel-up base 64");
-  assert.match(script, /\b65\b|b % 2|b % 2/, "distinguishes up/down parity");
+  // SGR wheel base codes: strict 64/65 after modifier mask (not bare b>=64)
+  assert.match(script, /base=.*64|\"64\"/, "wheel-up base 64");
+  assert.match(script, /\"65\"|base.*65/, "wheel-down base 65");
+  assert.match(script, /WHEEL_PET_MS|last_wheel_pet/, "debounce thrash guard");
 });
 
 test("card loop reads @herald_draw and passes --draw/--draw-tick to render", () => {

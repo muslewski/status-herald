@@ -63,6 +63,10 @@ trap 'exit 129' HUP
 tick=0
 draw_tick=0
 prev_draw=
+# Debounce wheel→pet (ms). Trackpad inertia fires dozens of SGR wheel events;
+# without this the denizen cycles every frame while the window is focused.
+WHEEL_PET_MS=450
+last_wheel_pet_ms=0
 
 # Apply a chrome action (pause | pet | pet-prev). Returns 0 if handled.
 chrome_action() {
@@ -135,18 +139,26 @@ read_event() {
   rest=${seq#*;}
   x=${rest%%;*}
   y=${rest#*;}
-  # SGR wheel: 64 = up, 65 = down (+ even modifiers keep parity).
-  # Consume always so the terminal does not scroll the card scene.
-  if [[ "$b" =~ ^[0-9]+$ ]] && [ "$b" -ge 64 ]; then
-    IN_KIND=wheel
-    if [ $((b % 2)) -eq 0 ]; then
-      IN_WHEEL=up
-    else
-      IN_WHEEL=down
+  # SGR wheel: base 64 = up, 65 = down. Modifiers: +4 shift +8 meta +16 ctrl.
+  # Do NOT treat every b>=64 as wheel (that misfires on some motion/protocol codes
+  # and, with trackpad inertia, would thrash the denizen every frame).
+  # Consume pure wheel always so the terminal does not scroll the card scene.
+  if [[ "$b" =~ ^[0-9]+$ ]]; then
+    # bit5 (32) = motion report — never a discrete wheel click
+    if [ $((b & 32)) -eq 0 ]; then
+      base=$((b & ~28)) # strip shift/meta/ctrl
+      if [ "$base" = "64" ] || [ "$base" = "65" ]; then
+        IN_KIND=wheel
+        if [ "$base" = "64" ]; then
+          IN_WHEEL=up
+        else
+          IN_WHEEL=down
+        fi
+        IN_X=$x
+        IN_Y=$y
+        return 0
+      fi
     fi
-    IN_X=$x
-    IN_Y=$y
-    return 0
   fi
   # button 0 = left click; SGR: b=0 left press (32 = motion+left — ignore drag)
   if [[ "$b" != "0" && "$b" != "32" ]]; then
@@ -216,10 +228,8 @@ while :; do
     --session "${sess_name:-}" \
     --cols "$cols" --rows "$rows" --color always \
     "${draw_flags[@]}" 2>/dev/null || true
-  # Wipe outer terminal scrollback (Ghostty) + tmux history every frame so a
-  # trackpad scroll cannot dig up stacked paint/"matrix" debris over mosh.
-  printf '\033[3J' 2>/dev/null || true
-  tmux clear-history 2>/dev/null || true
+  # Scrollback wipe only at start (and once on wheel). Doing CSI 3J every frame
+  # can make Ghostty emit synthetic wheel events → denizen thrash feedback loop.
   tick=$((tick + 1))
   # Advance / complete stage-curtain phase on the existing tick loop.
   if [ "$draw" = "shut" ] || [ "$draw" = "open" ]; then
@@ -256,10 +266,19 @@ while :; do
     if [ "$IN_KIND" = "wheel" ]; then
       # Easter egg: scroll does not move the scene — it cycles the pet.
       # up → previous, down → next. Never reveal on wheel.
-      if [ "$IN_WHEEL" = "up" ]; then
-        chrome_action pet-prev "$sess" || true
-      else
-        chrome_action pet "$sess" || true
+      # Debounce: one pet per WHEEL_PET_MS (inertia otherwise thrashs the roster).
+      now_ms=$(date +%s%3N 2>/dev/null || echo $(($(date +%s) * 1000)))
+      elapsed=$((now_ms - last_wheel_pet_ms))
+      if [ "$last_wheel_pet_ms" -eq 0 ] || [ "$elapsed" -ge "$WHEEL_PET_MS" ]; then
+        last_wheel_pet_ms=$now_ms
+        if [ "$IN_WHEEL" = "up" ]; then
+          chrome_action pet-prev "$sess" || true
+        else
+          chrome_action pet "$sess" || true
+        fi
+        # Occasional scrollback wipe on intentional wheel only (not every frame).
+        printf '\033[3J' 2>/dev/null || true
+        tmux clear-history 2>/dev/null || true
       fi
     else
       if [ "$IN_KIND" = "click" ]; then
