@@ -13,6 +13,9 @@ are not soft-aliased (see design D3).
 - **Curtain wheel easter egg**: scroll on the covered card no longer
   scrolls the scene — wheel **down** cycles the denizen next, wheel **up**
   previous (`pet` / `pet-prev`). SGR wheel events are consumed in the card loop.
+- **No more “matrix” scroll junk on the card**: `_curtain` enters the alternate
+  screen and sets `history-limit 0` so old paint frames never stack in pane
+  history (tmux `mouse on` was scrolling that debris).
 
 ### Fixed
 

@@ -92,6 +92,26 @@ test("card loop resets tick when herald state changes (settleAfter relative to e
 });
 
 // Act I: stage-curtain draw rides the existing tick loop (no new event loop).
+// Scrollback of old paints = "matrix code" when mouse-scrolling the card.
+test("card loop disables scrollback (alt screen + history-limit 0)", () => {
+  assert.match(
+    script,
+    /1049h/,
+    "enters alternate screen so paints do not fill primary history",
+  );
+  assert.match(
+    script,
+    /1049l/,
+    "leaves alternate screen on cleanup",
+  );
+  assert.match(
+    script,
+    /history-limit\s+0/,
+    "window history-limit 0 — nothing to scroll into",
+  );
+  assert.match(script, /clear-history/, "clears any inherited history at start");
+});
+
 // Easter egg: wheel must cycle pets, never scroll or reveal.
 test("card loop maps wheel to pet / pet-prev and never reveals on wheel", () => {
   assert.match(script, /IN_KIND=wheel|IN_WHEEL/, "decodes wheel events");

@@ -29,9 +29,16 @@ herald() {
 }
 
 printf '\033[?25l'
-# Mouse tracking (SGR): corner chrome buttons (× off / ↻ pet) are clickable.
+# Mouse tracking (SGR): corner chrome buttons (× off / ↻ pet) + wheel→pet.
 # Restored on exit so we never leave the host terminal sticky.
 printf '\033[?1000h\033[?1002h\033[?1006h' 2>/dev/null || true
+# Alternate screen + zero scrollback: the card repaints every tick. Without
+# this, those frames stack in pane history (history-limit 2000 default) and
+# with `mouse on` a scroll shows "matrix" rain of old paints / SGR debris.
+# Wheel must cycle pets, not dig through that junk.
+printf '\033[?1049h' 2>/dev/null || true
+tmux set-option -w history-limit 0 2>/dev/null || true
+tmux clear-history 2>/dev/null || true
 # On exit, reveal — which (when tmuxBar coupling is on) restores the status bar,
 # so a killed loop can't strand the dropped background.
 # Skip when refreshCards is mid kill/recreate (@herald_refreshing=1); otherwise
@@ -42,6 +49,7 @@ printf '\033[?1000h\033[?1002h\033[?1006h' 2>/dev/null || true
 # painting a dead tty and fleets accumulate 100+ glitching card processes.
 cleanup() {
   printf '\033[?1006l\033[?1002l\033[?1000l' 2>/dev/null || true
+  printf '\033[?1049l' 2>/dev/null || true
   s=$(tmux display -p "#{session_name}" 2>/dev/null)
   r=$(tmux show -t "$s" -v @herald_refreshing 2>/dev/null || true)
   [ "$r" = "1" ] || herald curtain reveal "$s" >/dev/null 2>&1 || true
