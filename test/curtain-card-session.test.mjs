@@ -92,6 +92,31 @@ test("card loop resets tick when herald state changes (settleAfter relative to e
 });
 
 // Act I: stage-curtain draw rides the existing tick loop (no new event loop).
+// Easter egg: wheel must cycle pets, never scroll or reveal.
+test("card loop maps wheel to pet / pet-prev and never reveals on wheel", () => {
+  assert.match(script, /IN_KIND=wheel|IN_WHEEL/, "decodes wheel events");
+  assert.match(script, /pet-prev/, "wheel-up path exists");
+  assert.match(
+    script,
+    /IN_KIND.*=.*wheel|wheel.*pet/,
+    "wheel handled as first-class kind",
+  );
+  // Wheel branch must call pet without falling into reveal.
+  const wheelStart = script.indexOf('if [ "$IN_KIND" = "wheel" ]');
+  assert.ok(wheelStart >= 0, "wheel if-block present");
+  const wheelSlice = script.slice(wheelStart, wheelStart + 450);
+  assert.match(wheelSlice, /pet-prev/, "up → pet-prev");
+  assert.match(wheelSlice, /chrome_action pet /, "down → pet");
+  assert.doesNotMatch(
+    wheelSlice,
+    /curtain reveal/,
+    "wheel must not reveal live pane",
+  );
+  // SGR wheel base codes documented in script
+  assert.match(script, /\b64\b/, "mentions SGR wheel-up base 64");
+  assert.match(script, /\b65\b|b % 2|b % 2/, "distinguishes up/down parity");
+});
+
 test("card loop reads @herald_draw and passes --draw/--draw-tick to render", () => {
   assert.match(script, /@herald_draw/, "reads draw phase");
   assert.match(script, /--draw/, "forwards draw direction");

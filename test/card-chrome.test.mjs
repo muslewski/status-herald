@@ -6,7 +6,7 @@ import {
   layoutChrome,
   paintChromePlain,
 } from "../lib/curtain/card-chrome.mjs";
-import { nextSpecies } from "../lib/curtain/denizens.mjs";
+import { nextSpecies, prevSpecies } from "../lib/curtain/denizens.mjs";
 
 test("layoutChrome places buttons on bottom row, right-aligned", () => {
   const L = layoutChrome(80, 24);
@@ -54,4 +54,13 @@ test("nextSpecies cycles fox→cat→owl→fox", () => {
   assert.equal(nextSpecies("cat"), "owl");
   assert.equal(nextSpecies("owl"), "fox");
   assert.ok(["fox", "cat", "owl"].includes(nextSpecies("")));
+});
+
+test("prevSpecies cycles fox←cat←owl←fox", () => {
+  assert.equal(prevSpecies("fox"), "owl");
+  assert.equal(prevSpecies("cat"), "fox");
+  assert.equal(prevSpecies("owl"), "cat");
+  assert.ok(["fox", "cat", "owl"].includes(prevSpecies("")));
+  // next then prev returns home
+  assert.equal(prevSpecies(nextSpecies("fox")), "fox");
 });

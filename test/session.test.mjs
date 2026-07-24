@@ -10,6 +10,7 @@ import {
   armAll,
   armIfMatch,
   cover,
+  cycleDenizen,
   disarm,
   focus,
   pause,
@@ -469,6 +470,16 @@ test("resolveFocusTargets: empty / exact / fuzzy / unknown", () => {
     resolveFocusTargets("Random Safari tab title", rows, names).kind,
     "unknown",
   );
+});
+
+
+test("cycleDenizen steps backward with dir -1", () => {
+  const t = makeT(freshSession());
+  arm("s1", t);
+  t.setSessOpt("s1", "@herald_entity", "cat");
+  assert.equal(cycleDenizen("s1", t, {}, -1), "fox");
+  assert.equal(t.getSessOpt("s1", "@herald_entity"), "fox");
+  assert.equal(cycleDenizen("s1", t, {}, 1), "cat");
 });
 
 test("stampSession sets session state and since on working", () => {

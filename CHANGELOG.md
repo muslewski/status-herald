@@ -8,6 +8,12 @@ are not soft-aliased (see design D3).
 
 ## [Unreleased]
 
+### Added
+
+- **Curtain wheel easter egg**: scroll on the covered card no longer
+  scrolls the scene — wheel **down** cycles the denizen next, wheel **up**
+  previous (`pet` / `pet-prev`). SGR wheel events are consumed in the card loop.
+
 ### Fixed
 
 - **Curtain glitching onto the active focused tab**: agent CLIs (Grok/Claude)

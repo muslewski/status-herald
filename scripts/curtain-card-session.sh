@@ -54,7 +54,7 @@ tick=0
 draw_tick=0
 prev_draw=
 
-# Apply a chrome action (pause | pet). Returns 0 if handled.
+# Apply a chrome action (pause | pet | pet-prev). Returns 0 if handled.
 chrome_action() {
   local act=$1 sess=$2
   case "$act" in
@@ -67,19 +67,25 @@ chrome_action() {
       herald curtain pet "$sess" >/dev/null 2>&1 || true
       return 0
       ;;
+    pet-prev)
+      # Wheel-up easter egg: previous denizen (fox←cat←owl).
+      herald curtain pet-prev "$sess" >/dev/null 2>&1 || true
+      return 0
+      ;;
   esac
   return 1
 }
 
 # Read one input event within $1 seconds.
-# Sets: IN_KIND=timeout|key|click  IN_KEY=  IN_X=  IN_Y=
+# Sets: IN_KIND=timeout|key|click|wheel  IN_KEY=  IN_X=  IN_Y=  IN_WHEEL=up|down
 read_event() {
   local timeout=$1
   IN_KIND=timeout
   IN_KEY=
   IN_X=
   IN_Y=
-  local c n m ch seq b x y
+  IN_WHEEL=
+  local c n m ch seq b x y rest
   if ! read -rsn1 -t "$timeout" c 2>/dev/null; then
     return 1
   fi
@@ -119,8 +125,20 @@ read_event() {
   rest=${seq#*;}
   x=${rest%%;*}
   y=${rest#*;}
-  # button 0 = left click (low 2 bits of b in basic protocol; SGR uses b directly)
-  # SGR: b=0 left press
+  # SGR wheel: 64 = up, 65 = down (+ even modifiers keep parity).
+  # Consume always so the terminal does not scroll the card scene.
+  if [[ "$b" =~ ^[0-9]+$ ]] && [ "$b" -ge 64 ]; then
+    IN_KIND=wheel
+    if [ $((b % 2)) -eq 0 ]; then
+      IN_WHEEL=up
+    else
+      IN_WHEEL=down
+    fi
+    IN_X=$x
+    IN_Y=$y
+    return 0
+  fi
+  # button 0 = left click; SGR: b=0 left press (32 = motion+left — ignore drag)
   if [[ "$b" != "0" && "$b" != "32" ]]; then
     IN_KIND=timeout
     return 1
@@ -221,24 +239,34 @@ while :; do
   if read_event "$secs"; then
     sess=$(tmux display -p '#{session_name}' 2>/dev/null)
     act=
-    if [ "$IN_KIND" = "click" ]; then
-      act=$(herald curtain chrome-hit --cols "${cols:-80}" --rows "${rows:-24}" \
-        --x "${IN_X:-0}" --y "${IN_Y:-0}" 2>/dev/null || true)
-    elif [ "$IN_KIND" = "key" ]; then
-      # Single-letter chrome shortcuts (x/o = off, a/p = pet). Else reveal.
-      act=$(herald curtain chrome-hit --key "${IN_KEY:-}" 2>/dev/null || true)
-    fi
-    if [ -n "$act" ] && chrome_action "$act" "$sess"; then
-      # pause already reveals; pet stays on card (next tick shows new animal)
-      :
-    else
-      # Default: any other click/key opens the live pane (fail-open).
-      if [ "${theme:-classic}" != "classic" ] && [ "$draw" != "open" ] && [ "$covered" = "1" ]; then
-        tmux set-option @herald_draw open 2>/dev/null || true
-        draw_tick=0
-        prev_draw=open
+    if [ "$IN_KIND" = "wheel" ]; then
+      # Easter egg: scroll does not move the scene — it cycles the pet.
+      # up → previous, down → next. Never reveal on wheel.
+      if [ "$IN_WHEEL" = "up" ]; then
+        chrome_action pet-prev "$sess" || true
       else
-        herald curtain reveal "$sess" >/dev/null 2>&1 || true
+        chrome_action pet "$sess" || true
+      fi
+    else
+      if [ "$IN_KIND" = "click" ]; then
+        act=$(herald curtain chrome-hit --cols "${cols:-80}" --rows "${rows:-24}" \
+          --x "${IN_X:-0}" --y "${IN_Y:-0}" 2>/dev/null || true)
+      elif [ "$IN_KIND" = "key" ]; then
+        # Single-letter chrome shortcuts (x/o = off, a/p = pet). Else reveal.
+        act=$(herald curtain chrome-hit --key "${IN_KEY:-}" 2>/dev/null || true)
+      fi
+      if [ -n "$act" ] && chrome_action "$act" "$sess"; then
+        # pause already reveals; pet stays on card (next tick shows new animal)
+        :
+      else
+        # Default: any other click/key opens the live pane (fail-open).
+        if [ "${theme:-classic}" != "classic" ] && [ "$draw" != "open" ] && [ "$covered" = "1" ]; then
+          tmux set-option @herald_draw open 2>/dev/null || true
+          draw_tick=0
+          prev_draw=open
+        else
+          herald curtain reveal "$sess" >/dev/null 2>&1 || true
+        fi
       fi
     fi
   fi
