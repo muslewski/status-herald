@@ -37,12 +37,30 @@ read_title() {
 
 if [ "$ONCE" = 1 ]; then read_title; echo; exit 0; fi
 
+# Empty titles mean "Ghostty not frontmost" → cover-all. But a single flaky
+# osascript read also returns "" while Ghostty is still focused; acting on that
+# yanks a curtain over the live pane the operator is looking at. Require a few
+# consecutive empties (~3 × pollMs) before covering.
+EMPTY_NEED=3
+empty_streak=0
 last="__init__"; start=$(date +%s)
 while :; do
   [ -n "$SENTINEL" ] && [ ! -f "$SENTINEL" ] && break
   [ "$MAXSEC" -gt 0 ] && [ $(( $(date +%s) - start )) -ge "$MAXSEC" ] && break
   t="$(read_title)"
-  if [ "$t" != "$last" ]; then herald curtain focus "$t" 2>/dev/null; last="$t"; fi
+  if [ -z "$t" ]; then
+    empty_streak=$((empty_streak + 1))
+    if [ "$empty_streak" -ge "$EMPTY_NEED" ] && [ "$last" != "" ]; then
+      herald curtain focus "" 2>/dev/null
+      last=""
+    fi
+  else
+    empty_streak=0
+    if [ "$t" != "$last" ]; then
+      herald curtain focus "$t" 2>/dev/null
+      last="$t"
+    fi
+  fi
   sleep "$POLL"
 done
 herald curtain reveal-all 2>/dev/null

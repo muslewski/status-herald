@@ -8,6 +8,16 @@ are not soft-aliased (see design D3).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Curtain glitching onto the active focused tab**: agent CLIs (Grok/Claude)
+  rewrite the terminal OSC title with chat status. `focus()` used to treat any
+  non-matching title as “cover everyone,” which yanked a card over the pane you
+  were looking at. Now unmatched titles are a **no-op** (fail-open); matching
+  uses session name (exact + longest substring in agent titles) as well as live
+  window name; `TITLE_FMT` is `#{session_name}`; poll adapter debounces empty
+  osascript blips (~3 ticks) before cover-all.
+
 ### Added
 
 - **Curtain attention sound** (default **off**) — on the edge into `needs`
