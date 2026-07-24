@@ -24,6 +24,10 @@ are not soft-aliased (see design D3).
 
 ### Fixed
 
+- **Wheel→pet stuck loop:** after the first scroll, `CSI 3J` on each pet
+  re-triggered wheel events (pet every ~450ms forever). Wheel path no longer
+  wipes scrollback; one **gesture** = one pet (burst coalesce + idle gap).
+
 - **Denizen thrash on focused card:** per-frame `CSI 3J` + loose
   `b>=64` wheel match caused continuous pet cycles (trackpad inertia /
   synthetic wheel). Wheel now matches only base 64/65, debounced (~450ms),

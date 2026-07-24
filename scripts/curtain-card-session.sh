@@ -63,10 +63,13 @@ trap 'exit 129' HUP
 tick=0
 draw_tick=0
 prev_draw=
-# Debounce wheel→pet (ms). Trackpad inertia fires dozens of SGR wheel events;
-# without this the denizen cycles every frame while the window is focused.
-WHEEL_PET_MS=450
-last_wheel_pet_ms=0
+# Wheel→pet is ONE pet per gesture, not rate-limited spam:
+# trackpad inertia / Ghostty can emit dozens of SGR wheel events per flick.
+# First event after WHEEL_IDLE_MS of silence → pet once; rest of the burst is
+# consumed only. Never CSI-3J on wheel (that re-fired wheel → stuck loop).
+WHEEL_IDLE_MS=550
+last_wheel_event_ms=0
+wheel_gesture_petted=0
 
 # Apply a chrome action (pause | pet | pet-prev). Returns 0 if handled.
 chrome_action() {
@@ -228,8 +231,6 @@ while :; do
     --session "${sess_name:-}" \
     --cols "$cols" --rows "$rows" --color always \
     "${draw_flags[@]}" 2>/dev/null || true
-  # Scrollback wipe only at start (and once on wheel). Doing CSI 3J every frame
-  # can make Ghostty emit synthetic wheel events → denizen thrash feedback loop.
   tick=$((tick + 1))
   # Advance / complete stage-curtain phase on the existing tick loop.
   if [ "$draw" = "shut" ] || [ "$draw" = "open" ]; then
@@ -266,20 +267,29 @@ while :; do
     if [ "$IN_KIND" = "wheel" ]; then
       # Easter egg: scroll does not move the scene — it cycles the pet.
       # up → previous, down → next. Never reveal on wheel.
-      # Debounce: one pet per WHEEL_PET_MS (inertia otherwise thrashs the roster).
+      # Gesture coalesce: silence ≥ WHEEL_IDLE_MS starts a new gesture; only the
+      # first event of a gesture pets. Mid-burst events are eaten so inertia
+      # cannot walk the whole roster. No CSI 3J here (feedback loop).
       now_ms=$(date +%s%3N 2>/dev/null || echo $(($(date +%s) * 1000)))
-      elapsed=$((now_ms - last_wheel_pet_ms))
-      if [ "$last_wheel_pet_ms" -eq 0 ] || [ "$elapsed" -ge "$WHEEL_PET_MS" ]; then
-        last_wheel_pet_ms=$now_ms
+      gap=$((now_ms - last_wheel_event_ms))
+      if [ "$last_wheel_event_ms" -eq 0 ] || [ "$gap" -ge "$WHEEL_IDLE_MS" ]; then
+        wheel_gesture_petted=0
+      fi
+      last_wheel_event_ms=$now_ms
+      if [ "$wheel_gesture_petted" -eq 0 ]; then
+        wheel_gesture_petted=1
         if [ "$IN_WHEEL" = "up" ]; then
           chrome_action pet-prev "$sess" || true
         else
           chrome_action pet "$sess" || true
         fi
-        # Occasional scrollback wipe on intentional wheel only (not every frame).
-        printf '\033[3J' 2>/dev/null || true
-        tmux clear-history 2>/dev/null || true
       fi
+      # Drain remaining wheel events in this burst so the next read_event is not
+      # immediately another wheel (and so we don't re-enter pet for ~500ms).
+      while read_event 0.02; do
+        [ "$IN_KIND" = "wheel" ] || break
+        last_wheel_event_ms=$(date +%s%3N 2>/dev/null || echo $(($(date +%s) * 1000)))
+      done
     else
       if [ "$IN_KIND" = "click" ]; then
         act=$(herald curtain chrome-hit --cols "${cols:-80}" --rows "${rows:-24}" \
