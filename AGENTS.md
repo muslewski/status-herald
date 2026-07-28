@@ -1,3 +1,7 @@
+<!-- sage-fleet-pointer -->
+**Parallel sessions** — other agent sessions may run concurrently. Before claiming work or opening a PR, use the `sage-fleet` skill (collision check → claim → merge brief). SAGE off/absent ⇒ silent no-op.
+<!-- /sage-fleet-pointer -->
+
 # Herald (status-herald) — Agent Runbook
 
 HERALD provides tmux "curtain" cards (`● WORKING m:ss`, `✅ DONE`, `⚠ NEEDS YOU`) that cover agent panes when unfocused. It reacts to hook events from the agent CLI running inside the tmux pane.

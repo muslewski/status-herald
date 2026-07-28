@@ -31,7 +31,8 @@
     "atlas:wire": "atlas wire all",
     "predev": "atlas gate",
     "mind:check": "atlas check",
-    "mind:build": "atlas build"
+    "mind:build": "atlas build",
+    "//sage-gate": "global only — sage gate (preferred judge) is machine-level; not chained into predev. run: sage gate"
   },
   "keywords": [
     "tmux",
