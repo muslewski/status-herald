@@ -105,14 +105,18 @@ Force a species (optional):
 
 ### Chrome (click / keys)
 
-Instant tab-open selects the live pane, so **card bottom buttons are not the primary hit target**. Use the **status bar** instead (always available while armed):
+**Primary: status bar** (always visible while armed; installed on `arm` / `arm-all`):
 
 | Control | Where | What it does |
 |---------|--------|----------------|
-| **× off** | status-right click, or card dock, or key `x`/`o` on card | Pause curtain (live stays up; no auto-cover until `resume`) |
-| **↻ pet** | status-right click, or card dock, or key `a`/`p` on card | Cycle animal fox → cat → owl |
+| **Click status** | `MouseDown1Status` | **Toggle** pause ↔ resume for this session |
+| **Click status-right** | menu | × off / ▶ on / ↻ pet |
+| **▶ curtain** glyph | status-right while paused | Re-enable affordance; click status to resume |
+| **× off / ↻ pet** | card dock (when on `_curtain`) or keys `x`/`o`, `a`/`p` | Same pause / pet |
 
-CLI: `herald curtain pause` / `herald curtain pet`. Needs `mouse on` for status clicks.
+Instant tab-open selects the live pane, so card buttons are secondary — status click works after open.
+
+CLI: `herald curtain pause` / `resume` / `pet` / `status-click` / `status-menu`. Needs `mouse on`.
 
 
 ---

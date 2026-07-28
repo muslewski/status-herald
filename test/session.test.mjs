@@ -10,11 +10,13 @@ import {
   armAll,
   armIfMatch,
   cover,
+  cycleDenizen,
   disarm,
   focus,
   pause,
   pauseAll,
   refreshCards,
+  resolveFocusTargets,
   resume,
   resumeAll,
   reveal,
@@ -256,16 +258,24 @@ test("afterWindowKill: card killed → disarm cleanly, live work remains", () =>
   assert.ok(t._S.s1.windows["@live"]);
 });
 
-test("arm pins the terminal title to the live window, not the card", () => {
+test("arm pins the terminal title to the session name (stable focus key)", () => {
   const t = makeT(freshSession());
   arm("s1", t);
   assert.equal(t.getSessOpt("s1", "set-titles"), "on");
   const fmt = t.getSessOpt("s1", "set-titles-string");
-  // When the card is active the format must resolve the live window's name,
-  // otherwise a focused covered tab reports "_curtain" and focus() covers it.
+  // Session name is unique per Ghostty/mosh tab. Window names are often the
+  // generic "bash" for every fleet pane — matching those made focus() cover
+  // the active tab whenever an agent CLI rewrote the OSC title.
   assert.equal(fmt, TITLE_FMT);
-  assert.match(fmt, /@herald_live_win/);
-  assert.match(fmt, /_curtain/);
+  assert.equal(fmt, "#{session_name}");
+});
+
+test("arm re-applies TITLE_FMT on already-armed sessions (upgrade path)", () => {
+  const t = makeT(freshSession());
+  arm("s1", t);
+  t.setSessOpt("s1", "set-titles-string", "stale-fmt");
+  arm("s1", t); // idempotent path must refresh
+  assert.equal(t.getSessOpt("s1", "set-titles-string"), TITLE_FMT);
 });
 
 test("disarm drops the session-local title overrides", () => {
@@ -365,6 +375,122 @@ test("focus never covers an idle session", () => {
   t.setSessOpt("s2", "@herald_state", "idle");
   focus("Syndcast Backlog", t);
   assert.equal(t.getSessOpt("s2", "@herald_covered"), "0", "idle stays live");
+});
+
+// Agent CLIs (Grok/Claude) overwrite OSC titles with chat status. A focus
+// signal that matches no armed session must NOT cover the tab the operator is
+// already looking at — that was the "curtain glitches onto active focus" bug.
+test("focus with an unmatched agent OSC title is a no-op (fail-open)", () => {
+  const t = makeT(twoArmed());
+  // s1 revealed, s2 covered — operator is on s1
+  cover("s2", t);
+  assert.equal(t.getSessOpt("s1", "@herald_covered"), "0");
+  assert.equal(t.getSessOpt("s2", "@herald_covered"), "1");
+  focus("Mossferry Hermes Grok Profile Switching … - grok", t);
+  assert.equal(
+    t.getSessOpt("s1", "@herald_covered"),
+    "0",
+    "focused live pane must stay revealed",
+  );
+  assert.equal(
+    t.getSessOpt("s2", "@herald_covered"),
+    "1",
+    "other sessions hold prior state",
+  );
+  assert.equal(t._S.s1.active, "@w1", "live window stays selected");
+});
+
+test("focus matches session name exactly (stable focus key)", () => {
+  const t = makeT(twoArmed());
+  // Rename sessions to realistic fleet names while keeping window labels.
+  t._S.s1.opts = { ...t._S.s1.opts }; // keep
+  // twoArmed uses s1/s2 as session names — match those.
+  cover("s1", t);
+  cover("s2", t);
+  focus("s1", t);
+  assert.equal(t.getSessOpt("s1", "@herald_covered"), "0");
+  assert.equal(t.getSessOpt("s2", "@herald_covered"), "1");
+});
+
+test("focus fuzzy-matches session name inside agent OSC titles (longest wins)", () => {
+  const t = makeT({
+    hermes: {
+      opts: {
+        "@herald_armed": "1",
+        "@herald_live_win": "@h",
+        "@herald_state": "working",
+        "@herald_covered": "1",
+      },
+      active: "@curtain",
+      windows: { "@h": "bash", "@curtain": "_curtain" },
+    },
+    "hermes-demo": {
+      opts: {
+        "@herald_armed": "1",
+        "@herald_live_win": "@d",
+        "@herald_state": "working",
+        "@herald_covered": "1",
+      },
+      active: "@curtain",
+      windows: { "@d": "bash", "@curtain": "_curtain" },
+    },
+  });
+  focus("Mossferry Hermes-Demo Grok Profile … - grok", t);
+  assert.equal(
+    t.getSessOpt("hermes-demo", "@herald_covered"),
+    "0",
+    "longest session name wins",
+  );
+  assert.equal(
+    t.getSessOpt("hermes", "@herald_covered"),
+    "1",
+    "shorter substring does not steal focus",
+  );
+});
+
+test("resolveFocusTargets: empty / exact / fuzzy / unknown", () => {
+  const rows = [
+    { name: "hermes", liveWin: "@h" },
+    { name: "syndcast", liveWin: "@s" },
+  ];
+  const names = { "@h": "bash", "@s": "bash" };
+  assert.equal(resolveFocusTargets("", rows, names).kind, "empty");
+  assert.equal(resolveFocusTargets("hermes", rows, names).kind, "match");
+  assert.ok(resolveFocusTargets("hermes", rows, names).names.has("hermes"));
+  assert.equal(
+    resolveFocusTargets("Mossferry Hermes Grok …", rows, names).kind,
+    "match",
+  );
+  assert.ok(
+    resolveFocusTargets("Mossferry Hermes Grok …", rows, names).names.has(
+      "hermes",
+    ),
+  );
+  assert.equal(
+    resolveFocusTargets("Random Safari tab title", rows, names).kind,
+    "unknown",
+  );
+});
+
+
+test("cycleDenizen steps backward with dir -1", () => {
+  const t = makeT(freshSession());
+  arm("s1", t);
+  t.setSessOpt("s1", "@herald_entity", "cat");
+  assert.equal(cycleDenizen("s1", t, {}, -1), "fox");
+  assert.equal(t.getSessOpt("s1", "@herald_entity"), "fox");
+  assert.equal(cycleDenizen("s1", t, {}, 1), "cat");
+});
+
+test("cycleDenizen stamps morph_from for transform animation", () => {
+  const t = makeT(freshSession());
+  arm("s1", t);
+  t.setSessOpt("s1", "@herald_entity", "fox");
+  cycleDenizen("s1", t, {}, 1);
+  assert.equal(t.getSessOpt("s1", "@herald_entity"), "cat");
+  assert.equal(t.getSessOpt("s1", "@herald_morph_from"), "fox");
+  assert.equal(t.getSessOpt("s1", "@herald_morph_i"), "0");
+  assert.equal(t.getSessOpt("s1", "@herald_morph_n"), "6");
 });
 
 test("stampSession sets session state and since on working", () => {

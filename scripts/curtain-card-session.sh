@@ -29,9 +29,18 @@ herald() {
 }
 
 printf '\033[?25l'
-# Mouse tracking (SGR): corner chrome buttons (× off / ↻ pet) are clickable.
+# Mouse tracking (SGR): corner chrome buttons (× off / ↻ pet) + wheel→pet.
 # Restored on exit so we never leave the host terminal sticky.
 printf '\033[?1000h\033[?1002h\033[?1006h' 2>/dev/null || true
+# Kill "matrix" scroll junk hard:
+# 1) Alternate screen (1049) — paints stay off the primary buffer
+# 2) CSI 3J — erase terminal scrollback (Ghostty/xterm; mosh may still leak)
+# 3) tmux history-limit 0 + clear-history — pane history empty under mouse on
+# 4) Wrap stays OFF for the whole loop (paint uses absolute CUP, no \n scroll)
+# Wheel must cycle pets, not dig through stacked OSC frames.
+printf '\033[?1049h\033[2J\033[3J\033[H\033[?7l' 2>/dev/null || true
+tmux set-option -w history-limit 0 2>/dev/null || true
+tmux clear-history 2>/dev/null || true
 # On exit, reveal — which (when tmuxBar coupling is on) restores the status bar,
 # so a killed loop can't strand the dropped background.
 # Skip when refreshCards is mid kill/recreate (@herald_refreshing=1); otherwise
@@ -41,7 +50,8 @@ printf '\033[?1000h\033[?1002h\033[?1006h' 2>/dev/null || true
 # that returns continues the loop — after `tmux kill-window` the orphan keeps
 # painting a dead tty and fleets accumulate 100+ glitching card processes.
 cleanup() {
-  printf '\033[?1006l\033[?1002l\033[?1000l' 2>/dev/null || true
+  printf '\033[?7h\033[?1006l\033[?1002l\033[?1000l' 2>/dev/null || true
+  printf '\033[?1049l' 2>/dev/null || true
   s=$(tmux display -p "#{session_name}" 2>/dev/null)
   r=$(tmux show -t "$s" -v @herald_refreshing 2>/dev/null || true)
   [ "$r" = "1" ] || herald curtain reveal "$s" >/dev/null 2>&1 || true
@@ -53,8 +63,13 @@ trap 'exit 129' HUP
 tick=0
 draw_tick=0
 prev_draw=
+# Smooth wheel→pet: step at most every WHEEL_STEP_MS while scroll events flow.
+# Continuous scroll walks the roster; a single flick usually yields 1–2 steps.
+# No CSI-3J on wheel (that re-fired events → stuck loop).
+WHEEL_STEP_MS=200
+last_wheel_pet_ms=0
 
-# Apply a chrome action (pause | pet). Returns 0 if handled.
+# Apply a chrome action (pause | pet | pet-prev). Returns 0 if handled.
 chrome_action() {
   local act=$1 sess=$2
   case "$act" in
@@ -67,19 +82,25 @@ chrome_action() {
       herald curtain pet "$sess" >/dev/null 2>&1 || true
       return 0
       ;;
+    pet-prev)
+      # Wheel-up easter egg: previous denizen (fox←cat←owl).
+      herald curtain pet-prev "$sess" >/dev/null 2>&1 || true
+      return 0
+      ;;
   esac
   return 1
 }
 
 # Read one input event within $1 seconds.
-# Sets: IN_KIND=timeout|key|click  IN_KEY=  IN_X=  IN_Y=
+# Sets: IN_KIND=timeout|key|click|wheel  IN_KEY=  IN_X=  IN_Y=  IN_WHEEL=up|down
 read_event() {
   local timeout=$1
   IN_KIND=timeout
   IN_KEY=
   IN_X=
   IN_Y=
-  local c n m ch seq b x y
+  IN_WHEEL=
+  local c n m ch seq b x y rest
   if ! read -rsn1 -t "$timeout" c 2>/dev/null; then
     return 1
   fi
@@ -119,8 +140,28 @@ read_event() {
   rest=${seq#*;}
   x=${rest%%;*}
   y=${rest#*;}
-  # button 0 = left click (low 2 bits of b in basic protocol; SGR uses b directly)
-  # SGR: b=0 left press
+  # SGR wheel: base 64 = up, 65 = down. Modifiers: +4 shift +8 meta +16 ctrl.
+  # Do NOT treat every b>=64 as wheel (that misfires on some motion/protocol codes
+  # and, with trackpad inertia, would thrash the denizen every frame).
+  # Consume pure wheel always so the terminal does not scroll the card scene.
+  if [[ "$b" =~ ^[0-9]+$ ]]; then
+    # bit5 (32) = motion report — never a discrete wheel click
+    if [ $((b & 32)) -eq 0 ]; then
+      base=$((b & ~28)) # strip shift/meta/ctrl
+      if [ "$base" = "64" ] || [ "$base" = "65" ]; then
+        IN_KIND=wheel
+        if [ "$base" = "64" ]; then
+          IN_WHEEL=up
+        else
+          IN_WHEEL=down
+        fi
+        IN_X=$x
+        IN_Y=$y
+        return 0
+      fi
+    fi
+  fi
+  # button 0 = left click; SGR: b=0 left press (32 = motion+left — ignore drag)
   if [[ "$b" != "0" && "$b" != "32" ]]; then
     IN_KIND=timeout
     return 1
@@ -152,6 +193,9 @@ while :; do
   draw_frames=${O[@herald_draw_frames]:-8}
   entity=${O[@herald_entity]:-}
   seed=${O[@herald_seed]:-0}
+  morph_from=${O[@herald_morph_from]:-}
+  morph_i=${O[@herald_morph_i]:-0}
+  morph_n=${O[@herald_morph_n]:-6}
   # settleAfter is relative to state entry: a monotonic tick from arm freezes
   # DONE/COMPACTING animation after a long WORKING session. Reset on change so
   # the first paint of the new state uses tick 0.
@@ -177,6 +221,19 @@ while :; do
   if [ "$draw" = "shut" ] || [ "$draw" = "open" ]; then
     draw_flags=(--draw "$draw" --draw-tick "$draw_tick")
   fi
+  # Pet transform: cross-dissolve morph_from → entity over morph_n paints.
+  morph_flags=()
+  if [ -n "$morph_from" ] && [ -n "$entity" ] && [ "$morph_from" != "$entity" ]; then
+    # progress 0..1 across frames 0..n-1
+    morph_p=$(awk -v i="${morph_i:-0}" -v n="${morph_n:-6}" 'BEGIN{
+      if (n < 2) { print 1; exit }
+      p = i / (n - 1)
+      if (p < 0) p = 0
+      if (p > 1) p = 1
+      printf "%.4f", p
+    }')
+    morph_flags=(--morph-from "$morph_from" --morph-progress "$morph_p")
+  fi
   # Session name for the card label (prefix+$ renames show up next tick).
   sess_name=$(tmux display -p '#{session_name}' 2>/dev/null || true)
   herald render --surface curtain-card \
@@ -187,7 +244,18 @@ while :; do
     --entity "${entity:-}" --seed "${seed:-0}" \
     --session "${sess_name:-}" \
     --cols "$cols" --rows "$rows" --color always \
-    "${draw_flags[@]}" 2>/dev/null || true
+    "${draw_flags[@]}" "${morph_flags[@]}" 2>/dev/null || true
+  # Advance morph after paint; clear when done.
+  if [ -n "$morph_from" ] && [ -n "$entity" ] && [ "$morph_from" != "$entity" ]; then
+    next_mi=$((morph_i + 1))
+    if [ "$next_mi" -ge "${morph_n:-6}" ]; then
+      tmux set-option -u @herald_morph_from 2>/dev/null || true
+      tmux set-option -u @herald_morph_i 2>/dev/null || true
+      tmux set-option -u @herald_morph_n 2>/dev/null || true
+    else
+      tmux set-option @herald_morph_i "$next_mi" 2>/dev/null || true
+    fi
+  fi
   tick=$((tick + 1))
   # Advance / complete stage-curtain phase on the existing tick loop.
   if [ "$draw" = "shut" ] || [ "$draw" = "open" ]; then
@@ -204,10 +272,12 @@ while :; do
       prev_draw=
     fi
   fi
-  # Pace: draw burst uses draw_ms (full shut/open ≤ ~600ms); else theme hot rate
-  # ONLY while covered/visible; otherwise 1 s.
+  # Pace: draw burst uses draw_ms (full shut/open ≤ ~600ms); morph ~12fps;
+  # else theme hot rate ONLY while covered/visible; otherwise 1 s.
   if [ "$draw" = "shut" ] || [ "$draw" = "open" ]; then
     ms=${draw_ms:-75}
+  elif [ -n "$morph_from" ] && [ "$morph_from" != "$entity" ]; then
+    ms=90
   elif [ "$covered" = "1" ]; then
     ms=${frame_ms:-1000}
   else
@@ -221,24 +291,53 @@ while :; do
   if read_event "$secs"; then
     sess=$(tmux display -p '#{session_name}' 2>/dev/null)
     act=
-    if [ "$IN_KIND" = "click" ]; then
-      act=$(herald curtain chrome-hit --cols "${cols:-80}" --rows "${rows:-24}" \
-        --x "${IN_X:-0}" --y "${IN_Y:-0}" 2>/dev/null || true)
-    elif [ "$IN_KIND" = "key" ]; then
-      # Single-letter chrome shortcuts (x/o = off, a/p = pet). Else reveal.
-      act=$(herald curtain chrome-hit --key "${IN_KEY:-}" 2>/dev/null || true)
-    fi
-    if [ -n "$act" ] && chrome_action "$act" "$sess"; then
-      # pause already reveals; pet stays on card (next tick shows new animal)
-      :
+    if [ "$IN_KIND" = "wheel" ]; then
+      # Easter egg: scroll does not move the scene — it cycles the pet.
+      # up → previous, down → next. Never reveal on wheel.
+      # Smooth rate limit: at most one step per WHEEL_STEP_MS while events flow
+      # (continuous scroll walks roster; no stuck loop; no CSI 3J).
+      now_ms=$(date +%s%3N 2>/dev/null || echo $(($(date +%s) * 1000)))
+      if [ "$last_wheel_pet_ms" -eq 0 ] || [ $((now_ms - last_wheel_pet_ms)) -ge "$WHEEL_STEP_MS" ]; then
+        last_wheel_pet_ms=$now_ms
+        if [ "${IN_WHEEL:-down}" = "up" ]; then
+          chrome_action pet-prev "$sess" || true
+        else
+          chrome_action pet "$sess" || true
+        fi
+      fi
+      # Drain burst; allow another step only after WHEEL_STEP_MS (hold-scroll).
+      while read_event 0.015; do
+        [ "$IN_KIND" = "wheel" ] || break
+        now_ms=$(date +%s%3N 2>/dev/null || echo $(($(date +%s) * 1000)))
+        if [ $((now_ms - last_wheel_pet_ms)) -ge "$WHEEL_STEP_MS" ]; then
+          last_wheel_pet_ms=$now_ms
+          if [ "${IN_WHEEL:-down}" = "up" ]; then
+            chrome_action pet-prev "$sess" || true
+          else
+            chrome_action pet "$sess" || true
+          fi
+        fi
+      done
     else
-      # Default: any other click/key opens the live pane (fail-open).
-      if [ "${theme:-classic}" != "classic" ] && [ "$draw" != "open" ] && [ "$covered" = "1" ]; then
-        tmux set-option @herald_draw open 2>/dev/null || true
-        draw_tick=0
-        prev_draw=open
+      if [ "$IN_KIND" = "click" ]; then
+        act=$(herald curtain chrome-hit --cols "${cols:-80}" --rows "${rows:-24}" \
+          --x "${IN_X:-0}" --y "${IN_Y:-0}" 2>/dev/null || true)
+      elif [ "$IN_KIND" = "key" ]; then
+        # Single-letter chrome shortcuts (x/o = off, a/p = pet). Else reveal.
+        act=$(herald curtain chrome-hit --key "${IN_KEY:-}" 2>/dev/null || true)
+      fi
+      if [ -n "$act" ] && chrome_action "$act" "$sess"; then
+        # pause already reveals; pet stays on card (next tick shows new animal)
+        :
       else
-        herald curtain reveal "$sess" >/dev/null 2>&1 || true
+        # Default: any other click/key opens the live pane (fail-open).
+        if [ "${theme:-classic}" != "classic" ] && [ "$draw" != "open" ] && [ "$covered" = "1" ]; then
+          tmux set-option @herald_draw open 2>/dev/null || true
+          draw_tick=0
+          prev_draw=open
+        else
+          herald curtain reveal "$sess" >/dev/null 2>&1 || true
+        fi
       fi
     fi
   fi

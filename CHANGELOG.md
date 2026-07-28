@@ -10,6 +10,50 @@ are not soft-aliased (see design D3).
 
 ### Added
 
+- **Status-bar curtain chrome (clickable pause/resume):**
+  - `MouseDown1Status` → toggle pause ↔ resume (`herald curtain status-click`)
+  - `MouseDown1StatusRight` → menu: × off / ▶ on / ↻ pet (`status-menu`)
+  - While paused, status-right shows static **`▶ curtain`** glyph (re-enable
+    affordance; no `#()` / status-interval cost)
+  - Binds installed on `arm` / `arm-all` (absolute node+bin path)
+  - Compat script `scripts/status-chrome-menu.sh` for old binds
+- **Curtain wheel easter egg**: scroll on the covered card no longer
+  scrolls the scene — wheel **down** cycles the denizen next, wheel **up**
+  previous (`pet` / `pet-prev`). SGR wheel events are consumed in the card loop.
+- **Matrix scroll (round 2):** paint uses absolute CUP per row (no `\n`
+  chain), wrap stays off, and each frame erases outer terminal scrollback
+  (`CSI 3J`) plus `tmux clear-history` so Ghostty/mosh trackpad scroll cannot
+  dig up stacked SGR frames.
+
+- **No more “matrix” scroll junk on the card**: `_curtain` enters the alternate
+  screen and sets `history-limit 0` so old paint frames never stack in pane
+  history (tmux `mouse on` was scrolling that debris).
+
+### Fixed
+
+- **Smooth wheel pet + morph:** scroll steps the roster every ~200ms while
+  events flow (hold-scroll walks fox→cat→owl). Pet change cross-dissolves
+  (`@herald_morph_*`, ~6 frames) instead of hard-swapping the creature.
+
+- **Wheel→pet stuck loop:** after the first scroll, `CSI 3J` on each pet
+  re-triggered wheel events (pet every ~450ms forever). Wheel path no longer
+  wipes scrollback; one **gesture** = one pet (burst coalesce + idle gap).
+
+- **Denizen thrash on focused card:** per-frame `CSI 3J` + loose
+  `b>=64` wheel match caused continuous pet cycles (trackpad inertia /
+  synthetic wheel). Wheel now matches only base 64/65, debounced (~450ms),
+  and scrollback wipe runs at start / on intentional wheel — not every paint.
+
+- **Curtain glitching onto the active focused tab**: agent CLIs (Grok/Claude)
+  rewrite the terminal OSC title with chat status. `focus()` used to treat any
+  non-matching title as “cover everyone,” which yanked a card over the pane you
+  were looking at. Now unmatched titles are a **no-op** (fail-open); matching
+  uses session name (exact + longest substring in agent titles) as well as live
+  window name; `TITLE_FMT` is `#{session_name}`; poll adapter debounces empty
+  osascript blips (~3 ticks) before cover-all.
+
+### Added
+
 - **Curtain attention sound** (default **off**) — on the edge into `needs`
   (approval / permission), Herald can fire pluggable backends (`command`,
   `local`, `ssh`, `ntfy`). Config under `curtain.sound`; CLI:

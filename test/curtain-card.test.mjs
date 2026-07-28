@@ -138,16 +138,16 @@ test("CLI render repaints in place (no full-screen clear that would flicker)", (
     ],
     { encoding: "utf8" },
   );
-  // The flicker fix: home the cursor and overwrite in place rather than erase the
-  // whole screen (2J) each frame -- the 2J blanks every row before the repaint.
+  // The flicker fix: absolute CUP per row + overwrite, never erase-screen (2J).
   // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC (\x1b) is the literal byte the erase-screen sequence starts with; intentional.
   assert.doesNotMatch(out, /\x1b\[2J/); // must NOT clear the screen
-  // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC (\x1b) is the literal byte the cursor-home sequence starts with; intentional.
-  assert.match(out, /\x1b\[H/); // homes the cursor instead
-  // Wrap is turned off around the paint so a double-width glyph cannot spill onto
-  // the next row and scroll the block (which ghosted the label as a second copy).
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC CUP home row
+  assert.match(out, /\x1b\[1;1H/); // absolute row paint (no \n chain)
+  // Wrap is turned off so a double-width glyph cannot spill and scroll the pane.
   // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC (\x1b) is the literal byte the DECAWM sequence starts with; intentional.
   assert.match(out, /\x1b\[\?7l/); // wrap disabled
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC
+  assert.doesNotMatch(out, /\x1b\[\?7h/); // wrap stays off for the card frame
   // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC (\x1b) is the literal byte that opens an SGR/CSI sequence; intentional.
   assert.match(out.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, ""), /WORKING/);
 });
@@ -431,6 +431,33 @@ test("renderCardFrame erases to end of line on each row (anti-ghost)", () => {
   assert.match(out, /\x1b\[K/); // per-line erase present
   // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC (\x1b) is the literal byte that opens an SGR sequence; intentional.
   assert.doesNotMatch(out, /\x1b\[2J/); // still no full-screen clear
+});
+
+test("renderCardFrame uses absolute CUP per row (no newline chain scroll)", () => {
+  const theme = {
+    background: "transparent",
+    states: { done: { fg: 32, glyph: "✓", label: "DONE" } },
+  };
+  const out = renderCardFrame({
+    state: "done",
+    elapsedSec: 0,
+    cols: 20,
+    rows: 6,
+    bg: {},
+    theme,
+    tick: 0,
+  });
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC for CUP
+  assert.match(out, /\x1b\[1;1H/);
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC for CUP
+  assert.match(out, /\x1b\[6;1H/);
+  // No CR/LF row advances — those are what scroll a fat line into "matrix" history
+  assert.doesNotMatch(out, /\r\n|\n/);
+  // Wrap stays off; do not re-enable wrap mid-card (enableWrap was the leak)
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC
+  assert.match(out, /\x1b\[\?7l/);
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC
+  assert.doesNotMatch(out, /\x1b\[\?7h/);
 });
 
 test("settleAfter freezes an animated state on its last frame", () => {

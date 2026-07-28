@@ -92,6 +92,61 @@ test("card loop resets tick when herald state changes (settleAfter relative to e
 });
 
 // Act I: stage-curtain draw rides the existing tick loop (no new event loop).
+// Scrollback of old paints = "matrix code" when mouse-scrolling the card.
+test("card loop disables scrollback (alt screen + history-limit 0)", () => {
+  assert.match(
+    script,
+    /1049h/,
+    "enters alternate screen so paints do not fill primary history",
+  );
+  assert.match(
+    script,
+    /1049l/,
+    "leaves alternate screen on cleanup",
+  );
+  assert.match(
+    script,
+    /history-limit\s+0/,
+    "window history-limit 0 — nothing to scroll into",
+  );
+  assert.match(script, /clear-history/, "clears any inherited history at start");
+  // CSI 3J only at card start — never on wheel/paint (wheel+3J feedback loop).
+  assert.match(script, /1049h.*3J|3J.*1049|\\033\[3J/, "scrollback wipe at start");
+  assert.match(script, /WHEEL_STEP_MS/, "rate-limited smooth wheel steps");
+  assert.match(script, /morph-from|morph_from|@herald_morph/, "pet transform morph");
+  // Must not wipe scrollback inside the wheel handler (re-fires wheel).
+  const wh = script.indexOf('if [ "$IN_KIND" = "wheel" ]');
+  assert.ok(wh >= 0);
+  const whBlock = script.slice(wh, wh + 1200);
+  assert.doesNotMatch(whBlock, /\\033\[3J|clear-history/, "no 3J/clear on wheel");
+});
+
+// Easter egg: wheel must cycle pets, never scroll or reveal.
+test("card loop maps wheel to pet / pet-prev and never reveals on wheel", () => {
+  assert.match(script, /IN_KIND=wheel|IN_WHEEL/, "decodes wheel events");
+  assert.match(script, /pet-prev/, "wheel-up path exists");
+  assert.match(
+    script,
+    /IN_KIND.*=.*wheel|wheel.*pet/,
+    "wheel handled as first-class kind",
+  );
+  // Wheel branch must call pet without falling into reveal.
+  const wheelStart = script.indexOf('if [ "$IN_KIND" = "wheel" ]');
+  assert.ok(wheelStart >= 0, "wheel if-block present");
+  const wheelSlice = script.slice(wheelStart, wheelStart + 900);
+  assert.match(wheelSlice, /pet-prev/, "up → pet-prev");
+  assert.match(wheelSlice, /chrome_action pet /, "down → pet");
+  assert.doesNotMatch(
+    wheelSlice,
+    /curtain reveal/,
+    "wheel must not reveal live pane",
+  );
+  // SGR wheel base codes: strict 64/65 after modifier mask (not bare b>=64)
+  assert.match(script, /base=.*64|\"64\"/, "wheel-up base 64");
+  assert.match(script, /\"65\"|base.*65/, "wheel-down base 65");
+  assert.match(script, /WHEEL_STEP_MS/, "smooth step interval while scrolling");
+});
+
 test("card loop reads @herald_draw and passes --draw/--draw-tick to render", () => {
   assert.match(script, /@herald_draw/, "reads draw phase");
   assert.match(script, /--draw/, "forwards draw direction");

@@ -38,12 +38,13 @@ Non-classic themes put a **per-session creature** on the card — fox, cat, or o
 
 Full lore, poses, and config: **[docs/BESTIARY.md](./docs/BESTIARY.md)**.
 
-**Card chrome** (bottom-right, dim): click **`× off`** to pause the curtain for that session, **`↻ pet`** to cycle the animal. Keys: `x`/`o` = off, `a`/`p` = pet. Anywhere else = open the live pane (as before).
+**Status bar chrome** (primary): click the **status bar** to toggle curtain **pause** ↔ **resume**. While paused, status-right shows **`▶ curtain`** (click again to re-enable). Status-right opens a short menu (off / on / pet). **Card chrome** (secondary): **`× off`** / **`↻ pet`**. Keys on card: `x`/`o` = off, `a`/`p` = pet.
 
 ```bash
 herald curtain pause          # same as × off (this session)
 herald curtain resume         # curtains can cover again
 herald curtain pet            # same as ↻ pet
+herald curtain status-menu    # display-menu (pause / resume / pet)
 ```
 
 ## Curtain (phase 1)

@@ -24,7 +24,14 @@
     "lint": "biome check .",
     "format": "biome format --write .",
     "docs:check": "node ../docs-kit/bin/docs-kit.mjs check docs/",
-    "docs:health": "node ../docs-kit/bin/docs-kit.mjs health docs/"
+    "docs:health": "node ../docs-kit/bin/docs-kit.mjs health docs/",
+    "atlas": "atlas",
+    "atlas:gate": "atlas gate",
+    "atlas:doctor": "atlas doctor",
+    "atlas:wire": "atlas wire all",
+    "predev": "atlas gate",
+    "mind:check": "atlas check",
+    "mind:build": "atlas build"
   },
   "keywords": [
     "tmux",
@@ -47,6 +54,7 @@
   },
   "homepage": "https://herald.muslewski.com/",
   "devDependencies": {
-    "@biomejs/biome": "1.9.4"
+    "@biomejs/biome": "1.9.4",
+    "memory-atlas": "^0.5.2"
   }
 }
