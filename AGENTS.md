@@ -3,6 +3,7 @@
 <!-- /sage-fleet-pointer -->
 
 # Herald (status-herald) — Agent Runbook
+<!-- desk:ship=human-end-gate -->
 
 HERALD provides tmux "curtain" cards (`● WORKING m:ss`, `✅ DONE`, `⚠ NEEDS YOU`) that cover agent panes when unfocused. It reacts to hook events from the agent CLI running inside the tmux pane.
 
