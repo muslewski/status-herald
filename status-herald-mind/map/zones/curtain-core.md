@@ -1,11 +1,11 @@
 ---
 type: zone
-summary: "Curtain truth engine — STATES, truth leases (subagent/watcher/bg_shell/turn), settle policy, hook stamp path, NEEDS-edge attention sound (pluggable backends), session arm/cover/reveal/focus, tmux opts, grid up/down, wash/bar coupling, debug capture."
-tags: [curtain, leases, tmux, session]
-status: seeded
+summary: "Curtain truth engine — STATES, truth leases, chrome-parity host inventory reconcile on settle, hook stamp path, NEEDS sound, arm/cover/reveal/focus, tmux opts, grid, wash, debug."
+tags: [curtain, leases, tmux, session, chrome-parity]
+status: active
 created: 2026-07-21
-updated: 2026-07-23
-verifiedAt: unverified
+updated: 2026-07-30
+verifiedAt: f1bafabb
 owns:
   routes: []
   testids: []
@@ -25,10 +25,13 @@ owns:
 depends:
   - "[[agent-adapters]]"
   - "[[config]]"
+  - "[[status-engine]]"
 invariants: []
 skills: []
-related: []
-sources: []
+related:
+  - "[[status-engine]]"
+sources:
+  - "[[2026-07-30-chrome-parity-counts-design]]"
 ---
 
 ## What this is
@@ -41,7 +44,7 @@ Core **curtain lifecycle**: opaque status cards cover unfocused agent panes; foc
 | `lease.mjs` | Pure truth-lease algebra — every WORKING hold is `{kind,id,exp}` with TTL |
 | `settle.mjs` | Pure settle policy (synth quiet, leak, max working/needs) |
 | `hook.mjs` | Stdin JSON → normalized event (via adapters); tool/watcher classification |
-| `session.mjs` | Arm/disarm, stampFromHook, cover/reveal/focus/pause, PID backstop |
+| `session.mjs` | Arm/disarm, stampFromHook, **applyHostInventory** (Grok meta reconcile), cover/reveal/focus/pause, PID backstop |
 | `orchestrator.mjs` | Pane swap cover/reveal + onEvent/onFocusIn/Out |
 | `tmux.mjs` | Session opts (`@herald_state`, `@herald_leases`, peers) |
 | `wash.mjs` | Status-bar state colour wash while covered |
@@ -50,6 +53,8 @@ Core **curtain lifecycle**: opaque status cards cover unfocused agent panes; foc
 | `debug.mjs` | Capture / debug log paths |
 
 Prefer a brief false `DONE` over a card stuck on WORKING: leases expire; they do not cling.
+
+**Chrome-parity counts:** hooks drive WORKING/NEEDS; Grok **counts** come from `[[status-engine]]` `grok-inventory` on each `applySettle` tick (`status: running` metas). Spawn without id uses single `syn-spawn-pending`, not per-second stacking. Claude `task_list` keeps `background_tasks[]` as authority.
 
 ## Anchors
 

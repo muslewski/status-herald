@@ -472,7 +472,6 @@ test("resolveFocusTargets: empty / exact / fuzzy / unknown", () => {
   );
 });
 
-
 test("cycleDenizen steps backward with dir -1", () => {
   const t = makeT(freshSession());
   arm("s1", t);
@@ -2825,4 +2824,132 @@ test("stampFromHook does not fire sound when sound disabled (default)", () => {
   );
   assert.equal(t.getSessOpt("s1", "@herald_state"), "needs");
   assert.equal(calls.length, 0);
+});
+
+// --- Chrome-parity counts (2026-07-30) ---
+
+test("spawn_subagent Pre+Post without id grants one provisional lease", () => {
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  const base = {
+    toolName: "spawn_subagent",
+    hasTasks: false,
+    sourceCli: "grok",
+    agentId: "",
+    toolTaskId: "",
+  };
+  stampFromHook("%9", { event: "PreToolUse", ...base }, 1000, t);
+  stampFromHook("%9", { event: "PostToolUse", ...base }, 1001, t);
+  stampFromHook("%9", { event: "PreToolUse", ...base }, 1002, t);
+  assert.equal(
+    liveAt(t, 1002).subagent,
+    1,
+    "must not stack provisional spawns",
+  );
+  const raw = t.getSessOpt("s1", "@herald_leases");
+  assert.ok(
+    raw.includes("syn-spawn-pending"),
+    `expected provisional id, got ${raw}`,
+  );
+});
+
+test("spawn_subagent Post with toolTaskId replaces provisional", () => {
+  const t = makeT(freshSession());
+  t.sessionOf = () => "s1";
+  stampFromHook(
+    "%9",
+    {
+      event: "PreToolUse",
+      toolName: "spawn_subagent",
+      hasTasks: false,
+      sourceCli: "grok",
+      toolTaskId: "",
+    },
+    1000,
+    t,
+  );
+  stampFromHook(
+    "%9",
+    {
+      event: "PostToolUse",
+      toolName: "spawn_subagent",
+      hasTasks: false,
+      sourceCli: "grok",
+      toolTaskId: "child-99",
+    },
+    1001,
+    t,
+  );
+  assert.equal(liveAt(t, 1001).subagent, 1);
+  const raw = t.getSessOpt("s1", "@herald_leases");
+  assert.ok(raw.includes("subagent:child-99:"), raw);
+  assert.ok(!raw.includes("syn-spawn-pending"), raw);
+});
+
+test("applySettle reconciles inflated leases to Grok host inventory", () => {
+  const t = makeT(freshSession());
+  // Plant 90 synthetic subagent leases (the live bug shape).
+  const parts = [];
+  for (let i = 0; i < 90; i++) {
+    parts.push(`subagent:syn-spawn-${1000 + i}:${1000 + 300}`);
+  }
+  parts.push("turn:turn:1300");
+  t.setSessOpt("s1", "@herald_leases", parts.join(","));
+  t.setSessOpt("s1", "@herald_state", "working");
+  t.setSessOpt("s1", "@herald_host_kind", "synthesis");
+  t.setSessOpt("s1", "@herald_agent_pid", "555");
+  t.setSessOpt("s1", "@herald_last_active", "1200");
+  t.setSessOpt("s1", "@herald_since", "1000");
+
+  const subIds = Array.from({ length: 25 }, (_, i) => `real-${i}`);
+  applySettle(
+    "s1",
+    1200,
+    t,
+    { lease: {}, settle: {} },
+    {
+      isPidAlive: () => true,
+      inventoryForPid: () => ({
+        subagentIds: subIds,
+        shellIds: ["bg-a"],
+        source: "grok-meta",
+        sessionDir: "/tmp/x",
+        sessionId: "s",
+        cwd: "/tmp",
+      }),
+    },
+  );
+
+  const live = liveAt(t, 1200);
+  assert.equal(live.subagent, 25, "must match chrome inventory not 90");
+  assert.equal(live.bg_shell, 1);
+  assert.equal(t.getSessOpt("s1", "@herald_inv_source"), "grok-meta");
+});
+
+test("applySettle does not reconcile Grok inventory over task_list host", () => {
+  const t = makeT(freshSession());
+  t.setSessOpt("s1", "@herald_leases", "subagent:c1:2000,subagent:c2:2000");
+  t.setSessOpt("s1", "@herald_state", "working");
+  t.setSessOpt("s1", "@herald_host_kind", "task_list");
+  t.setSessOpt("s1", "@herald_agent_pid", "555");
+  t.setSessOpt("s1", "@herald_last_active", "1500");
+  applySettle(
+    "s1",
+    1500,
+    t,
+    { lease: {}, settle: {} },
+    {
+      isPidAlive: () => true,
+      inventoryForPid: () => ({
+        subagentIds: ["should-not-apply"],
+        shellIds: [],
+        source: "grok-meta",
+        sessionDir: "/tmp/x",
+        sessionId: "s",
+        cwd: "/tmp",
+      }),
+    },
+  );
+  assert.equal(liveAt(t, 1500).subagent, 2, "Claude task_list inventory stays");
+  assert.equal(t.getSessOpt("s1", "@herald_inv_source"), "");
 });

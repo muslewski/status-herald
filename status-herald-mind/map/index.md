@@ -8,10 +8,10 @@
 | card-surface | seeded | seeded | Curtain card paint — renderCardFrame, themes (classic/minimal/…), Act I theatrics (stage-draw, motes, breathe), Act II denizens bestiary, ANSI helpers, tmux card tick scripts. |
 | cli | seeded | seeded | HERALD CLI entry — bin/herald → lib/cli.mjs routes curtain verbs (up/down/arm/hook/focus/install/doctor/inspect), status bars, and config print; version from package.json. |
 | config | seeded | seeded | Config load/merge for status-herald — DEFAULTS (curtain, lease, settle, animation, bars, sound), deep-merge from XDG/HERALD_CONFIG JSON, getConfigPath, titleStripPrefixes, themeBySession; missing/bad file never throws. |
-| curtain-core | seeded | seeded | Curtain truth engine — STATES, truth leases (subagent/watcher/bg_shell/turn), settle policy, hook stamp path, NEEDS-edge attention sound (pluggable backends), session arm/cover/reveal/focus, tmux opts, grid up/down, wash/bar coupling, debug capture. |
+| curtain-core | active | ok | Curtain truth engine — STATES, truth leases, chrome-parity host inventory reconcile on settle, hook stamp path, NEEDS sound, arm/cover/reveal/focus, tmux opts, grid, wash, debug. |
 | curtain-ops | seeded | seeded | Curtain ops surface — absolute-path hook install into Claude settings and Grok ~/.grok/hooks, doctor wiring checks, inspect stage-board (fleet rows + fzf session detail). |
 | focus-host | seeded | seeded | Focus adapters and host glue — scripts/focus-agent (ghostty-ssh-poll, hammerspoon stream, run dispatcher), Mac Hammerspoon lua spikes, optional systemd unit; external processes that call herald curtain focus. |
-| status-engine | seeded | seeded | Status surfaces engine — pure segments/gauges/width-drop, compute (transcript/effort), agent-status providers convention, soft bridges to token-oracle and agentic-sage, Claude statusline + tmux status renderers. |
+| status-engine | active | ok | Status surfaces engine — pure segments/gauges/width-drop, compute (transcript/effort), agent-status providers, Grok chrome inventory (subagents/meta), soft bridges to token-oracle and agentic-sage, Claude statusline + tmux status renderers. |
 
 ## ⚠ Verification gaps
 
@@ -19,10 +19,8 @@
 - zone card-surface: seeded — not yet verified (verifiedAt: unverified)
 - zone cli: seeded — not yet verified (verifiedAt: unverified)
 - zone config: seeded — not yet verified (verifiedAt: unverified)
-- zone curtain-core: seeded — not yet verified (verifiedAt: unverified)
 - zone curtain-ops: seeded — not yet verified (verifiedAt: unverified)
 - zone focus-host: seeded — not yet verified (verifiedAt: unverified)
-- zone status-engine: seeded — not yet verified (verifiedAt: unverified)
 
 ## ⚠ Graph coherence
 
@@ -34,19 +32,20 @@ _none_
 
 ## Ledger
 
-- specs: 8 (? 7 · approved 1)
-- plans: 18 (? 18)
+- specs: 11 (? 8 · active 2 · approved 1)
+- plans: 21 (? 21)
 - reports: 2 (? 2)
+- decisions: 1 (accepted 1)
 
 ### Recent
 
+- [[2026-07-30-chrome-parity-counts-plan]]
+- [[2026-07-30-chrome-parity-counts-design]]
+- [[2026-07-24-status-chrome-click-plan]]
+- [[2026-07-24-status-chrome-click-design]]
+- [[2026-07-24-curtain-scroll-pet-plan]]
+- [[2026-07-24-curtain-scroll-pet-design]]
 - [[2026-07-23-curtain-sound-plan]]
 - [[2026-07-23-curtain-sound-design]]
 - [[2026-07-18-herald-denizens-design]]
 - [[2026-07-18-denizens-p3-bestiary-config]]
-- [[2026-07-18-denizens-p2-denizens]]
-- [[2026-07-18-denizens-p1-motion-base]]
-- [[2026-07-18-denizens-RECONCILE]]
-- [[2026-07-17-herald-theatrics-design]]
-- [[2026-07-16-status-symbiosis-design]]
-- [[2026-07-16-p8-hostkind-truth]]
