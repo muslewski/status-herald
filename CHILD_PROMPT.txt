@@ -1,0 +1,12 @@
+You are an executor child in a fresh git worktree of status-herald at /home/kento/Repositories/status-herald/.claude/worktrees/truth-lease, branch feat/truth-lease.
+
+TASK: Implement ALL tasks, in order, from the committed plan file docs/superpowers/plans/2026-07-16-p1-herald-truth-lease.md (in this worktree). The design spec is docs/superpowers/specs/2026-07-16-status-symbiosis-design.md — read the sections the plan references. Follow the plan's Global Constraints exactly: TDD (write failing tests first), zero new runtime dependencies, soft-fail law, one conventional commit per completed task.
+
+Setup: run `npm install` first (node_modules is absent in a fresh worktree; the only dev dep is biome).
+
+Verify with: `npm test` and `npm run lint` — both green at every commit.
+
+In scope: this worktree only. Do NOT touch any other repository or the parent checkout. Do NOT push. Do NOT merge. Do NOT run generators or side-effect scripts the plan does not name. Live tmux sessions run on this machine: never arm/disarm/cover live sessions; the plan's live smoke is `bin/herald doctor` only (read-only).
+
+Keep an untracked PROGRESS.md ledger in the worktree (append one line per task with status). Your final message must end with exactly one line:
+RESULT: ok|partial|failed — commits: <n> — <one line summary>

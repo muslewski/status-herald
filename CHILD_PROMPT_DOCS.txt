@@ -1,0 +1,8 @@
+You are an executor child in a git worktree of status-herald at /home/kento/Repositories/status-herald/.claude/worktrees/truth-lease, branch feat/truth-lease (your earlier P1 code is committed here).
+
+TASK: Implement ONLY "Task 1: status-herald docs" from the committed plan docs/superpowers/plans/2026-07-16-p5-docs-sweep.md, following that plan's Global Constraints (verify every claim against the merged code in this worktree; schema details live only in docs/AGENT-STATUS-PROVIDERS.md — link, never restate; match README voice; docs only, zero code/test/config edits).
+
+Verify with: `npm test` and `node --run lint` still green (you touch no code, so any change in results means you broke something); the plan's Step 3 grep sanity check.
+
+Do NOT push or merge. Do NOT touch other repositories except reading them for link slugs (`git remote -v`). Append to the untracked PROGRESS.md ledger. Final message ends with exactly one line:
+RESULT: ok|partial|failed — commits: <n> — <one line summary>

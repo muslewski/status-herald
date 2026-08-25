@@ -1,0 +1,21 @@
+▶ executor: grok-4.5 (effort=high) @ SuperGrok Heavy (loadout: grok-high)
+I'll implement Task 1 from the docs plan: read the plan, verify claims against this worktree, then update only the status-herald docs.Reading merged implementation and current docs so every claim matches the code.Drafting the three docs from the verified code, then running the plan's sanity checks.Rephrasing the AGENTS removal note so Step 3's grep only hits CHANGELOG migration lines.## Task 1 complete
+
+**Commit:** `7f9916b` — `docs: works-well-with, changelog migration notes, agents refresh`
+
+### What changed
+
+| File | Change |
+|------|--------|
+| `README.md` | Replaced fail-working (“minute late to DONE”) with **truth-lease / fail-idle** (TTLs, RC1 Grok Stop, watcher bound, quiet settle, PID backstop). Added **Works well with** for token-oracle, agentic-sage, llm-armory + standalone-first + link to `docs/AGENT-STATUS-PROVIDERS.md`. |
+| `CHANGELOG.md` | **Created** Unreleased migration: four lease TTLs, removed `@herald_bg_*` / `tasks_seen`, oracle `forecast.json` feed + `HERALD_TOKEN_FEED`, doctor / adapters / providers. |
+| `AGENTS.md` | Confirmed lease config + option tables; added Agent Status Providers pointer; token-bridge path note; removal list deferred to CHANGELOG (Step 3 grep). |
+
+### Verification
+
+- Step 3 grep: hits **only** in `CHANGELOG.md` (removal notes)
+- `npm test`: **378 pass**, 0 fail
+- `node --run lint`: **green**
+- No code/test/config edits; no push/merge
+
+RESULT: ok — commits: 1 — Task 1 docs: Works well with, CHANGELOG D3 migration, AGENTS providers refresh

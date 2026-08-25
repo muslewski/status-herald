@@ -1,0 +1,25 @@
+▶ executor: grok-4.5 (effort=high) @ SuperGrok Heavy (loadout: grok-high)
+I'll implement the plan task-by-task in this worktree. Reading the plan and design spec, then installing deps.Installing dependencies and reading the current curtain/status modules so Task 1 can follow the existing patterns.Implementing Task 1: writing failing tests, then the lease algebra module.Pre-existing lint failures block the gate. Fixing those so commits stay green.Committing the lint baseline fix, then Task 1.Task 1 is done. Reading `hook.mjs` and related tests to extract adapters for Task 2.Implementing Task 2 adapters: writing tests first, then extracting normalization from `hook.mjs`.Rewiring `hook.mjs` to use the adapters while preserving `parseHookPayload` compatibility.Task 2 is done. Reading session/card sources and flipping tests for Task 3 (lease-backed stamp + RC1).Implementing lease-backed `stampFromHook` and updating related files. Using a helper script for bulk test updates.Rewriting core session lease logic and updating tests systematically.Updating the card script, CLI status, and session tests.Updating session tests with a bulk rewrite for lease vocabulary.Removing accidentally committed untracked files from the last commit.Implementing Task 4: lease-aware settle (RC2).Rewriting settle tests and implementing lease-aware settle.Implementing Task 8 bridges and curtain optional lines.## P1 Truth-Lease complete
+
+All 11 plan tasks landed on `feat/truth-lease` in this worktree. **378 tests pass**, **lint clean**. Not pushed.
+
+### What changed
+| Area | Result |
+|------|--------|
+| **Truth leases** | `@herald_leases` replaces bg counters; TTLs auto-drop expired holds |
+| **RC1** | Grok `Stop` reconciles subagent leases to empty → DONE |
+| **RC2** | No watcher immunity; watchers hold only while lease is live (default 900s) |
+| **RC3** | `@herald_settle_ts` + `herald doctor` diagnose dead card loops |
+| **Adapters** | Claude/Grok payload adapters behind `normalizePayload` |
+| **Status** | Bar glyph from curtain state; oracle token feed; sage bridge; optional model/zone lines |
+| **Convention** | `lib/status/providers.mjs` + `docs/AGENT-STATUS-PROVIDERS.md` |
+
+### Commits (12)
+Includes one biome baseline chore plus one conventional commit per task (1–11).
+
+### Live smoke (`bin/herald doctor`)
+Hooks absolute, tmux OK, card-loop bin OK. Covered live sessions report **missing `@herald_settle_ts`** — expected until those card loops are refreshed onto this build (`herald curtain refresh` when you choose to upgrade live arms; not done here per plan).
+
+`PROGRESS.md` is untracked with the task ledger + doctor output.
+
+RESULT: ok — commits: 12 — P1 truth-lease core: leases, RC1/RC2/RC3, adapters, providers, doctor; 378 tests green
