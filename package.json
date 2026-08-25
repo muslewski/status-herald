@@ -56,6 +56,6 @@
   "homepage": "https://herald.muslewski.com/",
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
-    "memory-atlas": "0.5.3"
+    "memory-atlas": "0.5.4"
   }
 }
