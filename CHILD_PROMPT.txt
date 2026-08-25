@@ -1,0 +1,13 @@
+You are an executor child in a git worktree of status-herald at /home/kento/Repositories/status-herald/.claude/worktrees/watcher-truth, branch fix/watcher-truth.
+
+TASK: Implement ALL tasks (1-4, in order) from the committed plan docs/superpowers/plans/2026-07-16-p6-watcher-truth.md. Follow its Global Constraints and TDD steps exactly. The plan contains the full diagnosis and exact code — where the plan's line numbers drift from the file, trust the code context shown in the plan, not the line number.
+
+In scope: lib/curtain/lease.mjs, lib/curtain/session.mjs, lib/curtain/hook.mjs, lib/curtain/settle.mjs, their test files under test/, and any AGENTS.md/docs sentence claiming watchers hold WORKING.
+Do NOT touch: lib/surfaces/, lib/status/, scripts/, bin/, docs/superpowers/plans/ (read-only), any other repository.
+
+Verify with: `npm test` (baseline 378 pass, 0 fail — plus your new tests) and `node --run lint` clean, after EVERY task.
+
+Do NOT run herald curtain install, do NOT run tmux commands against live sessions (tests use the fake tmux patterns already in test/). Do NOT push or merge. Do NOT run repo generators or side-effect scripts.
+
+One commit per completed task (4 commits expected). Append to the untracked PROGRESS.md ledger after each task. Never git add PROGRESS.md or CHILD_PROMPT.txt. Final message ends with exactly one line:
+RESULT: ok|partial|failed — commits: <n> — <one line summary>
